@@ -4,6 +4,26 @@ A small pipeline with no npm dependencies that turns one JSON file into an HTML 
 
 The visual layout follows the **Madelin Parker two-page A4** reference: a circular photo, large name, tagline, contact rows, thin section rules, bold uppercase section headings, single-column body copy, compact multi-column lists for skills/extras, and a repeated name on page 2.
 
+## Editor
+
+Start the local editor:
+
+```bash
+npm run editor
+```
+
+Open **http://127.0.0.1:4173**. The page loads `data/wakako-obata.json` into fields. **Save & rebuild** writes the JSON atomically, regenerates the HTML and PDF, and refreshes the preview. The editor also has a direct link to the generated PDF.
+
+The server binds to `127.0.0.1` by default. Use `PORT=4174 npm run editor` to pick another port. It has no npm dependencies and uses the same validation module as the build (`scripts/lib/validate.mjs`), so invalid data is rejected before the JSON file is touched.
+
+Useful endpoints:
+
+```text
+GET  /api/cv       current JSON
+PUT  /api/cv       validate + write JSON + rebuild
+POST /api/rebuild  rebuild without writing JSON
+```
+
 ## Build
 
 Requirements: Node 18+, Google Chrome/Chromium for the PDF, and optionally Ghostscript for the page-count check.
@@ -44,15 +64,18 @@ data/wakako-obata.json    # the CV content (single source of truth)
 templates/cv.html         # HTML skeleton with {{tokens}}
 styles/cv.css             # all layout, typography and @media print rules
 scripts/build.mjs         # JSON → HTML → PDF
+scripts/lib/validate.mjs  # shared data validation
 scripts/extract_docx.py   # helper: raw text extraction from the source DOCX
+server.mjs                # local editor server
+editor/                   # editor UI (HTML/CSS/JS)
 assets/wakako-obata.jpg   # photo extracted from the DOCX
 documents/                # original DOCX/PDF (git-ignored)
 ```
 
 ## Editing the CV
 
-- **Content** – edit `data/wakako-obata.json`, then run `npm run build`.
-- **Look and feel** – edit `styles/cv.css`. Screen preview and print share the same stylesheet; print rules are at the bottom of the file.
+- **Content** – use `npm run editor` for the form editor, or edit `data/wakako-obata.json` directly and run `npm run build`. Saving in the editor writes the JSON and rebuilds automatically.
+- **Look and feel** – edit `styles/cv.css`. Screen preview and print share the same stylesheet; print rules are at the bottom of the file. Use the **Rebuild** button in the preview bar (or `POST /api/rebuild`) to pick up CSS changes without saving form changes.
 - **Markup** – edit `templates/cv.html`. The `{{...}}` tokens are filled by `scripts/build.mjs`.
 
 The build validates required fields and fails on unknown template tokens, so a typo in the template does not silently produce an empty section.

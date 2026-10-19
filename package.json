@@ -7,6 +7,8 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "build:html": "node scripts/build.mjs --html-only",
-    "pdf": "node scripts/build.mjs"
+    "pdf": "node scripts/build.mjs",
+    "editor": "node server.mjs",
+    "start": "node server.mjs"
   }
 }

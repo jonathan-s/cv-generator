@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>CV editor – Wakako Obata</title>
+  <link rel="stylesheet" href="/editor.css">
+  <script src="/editor.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand__mark" aria-hidden="true">WO</span>
+      <span class="brand__text">
+        <strong>Wakako Obata</strong>
+        <span>CV editor</span>
+      </span>
+    </div>
+
+    <div class="topbar__actions">
+      <span id="status" class="status" role="status" aria-live="polite">Loading…</span>
+      <button id="reload" class="btn" type="button">Reload</button>
+      <button id="save" class="btn btn--primary" type="button">Save &amp; rebuild</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="editor-pane" aria-label="CV content editor">
+      <div class="pane-intro">
+        <h1>Content</h1>
+        <p>
+          Edit the fields below. Saving writes
+          <code>data/wakako-obata.json</code> and regenerates the HTML and PDF.
+        </p>
+      </div>
+
+      <nav id="jump-nav" class="jump-nav" aria-label="Sections"></nav>
+
+      <form id="form" class="form" autocomplete="off">
+        <p class="loading">Loading…</p>
+      </form>
+    </section>
+
+    <section class="preview-pane" aria-label="CV preview">
+      <div class="preview-bar">
+        <div class="preview-bar__title">
+          <span>Preview</span>
+          <span id="preview-meta" class="preview-bar__meta"></span>
+        </div>
+        <div class="preview-bar__actions">
+          <button id="rebuild" class="btn btn--ghost" type="button" title="Rebuild from the saved JSON">Rebuild</button>
+          <button id="refresh" class="btn btn--ghost" type="button">Refresh</button>
+          <a id="pdf-link" class="btn btn--ghost" href="/preview/wakako-obata.pdf" target="_blank" rel="noreferrer">Open PDF ↗</a>
+        </div>
+      </div>
+
+      <iframe id="preview" class="preview-frame" title="CV preview" src="/preview/wakako-obata.html"></iframe>
+    </section>
+  </main>
+</body>
+</html>

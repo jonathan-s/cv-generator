@@ -11,9 +11,10 @@ import { cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
+import { validateCv } from "./lib/validate.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -22,7 +23,6 @@ const paths = {
   data: join(root, "data", "wakako-obata.json"),
   template: join(root, "templates", "cv.html"),
   styles: join(root, "styles", "cv.css"),
-  assets: join(root, "assets"),
   outDir: join(root, "dist"),
   html: join(root, "dist", "wakako-obata.html"),
   pdf: join(root, "dist", "wakako-obata.pdf"),
@@ -127,40 +127,23 @@ const renderLanguages = (languages = []) =>
 
 const data = JSON.parse(await readFile(paths.data, "utf8"));
 
-for (const key of [
-  "meta",
-  "basics",
-  "labels",
-  "summary",
-  "experience",
-  "education",
-  "volunteer",
-  "skills",
-  "languages",
-  "hobbies",
-  "closing",
-]) {
-  requireField(data[key], `missing "${key}"`);
+const validationErrors = validateCv(data);
+if (validationErrors.length) {
+  throw new Error(
+    `CV data error:\n- ${validationErrors.join("\n- ")}`,
+  );
 }
 
-requireField(data.basics.name, 'missing "basics.name"');
-requireField(data.basics.photo, 'missing "basics.photo"');
+const photoSource = resolve(root, data.basics.photo);
 requireField(
-  existsSync(join(root, data.basics.photo)),
+  photoSource.startsWith(root + sep),
+  "basics.photo must be inside the project folder",
+);
+requireField(
+  existsSync(photoSource),
   `photo not found: ${data.basics.photo}`,
 );
-requireField(
-  data.experience.every((entry) => entry.title),
-  "every experience entry needs a title",
-);
-requireField(
-  data.education.every((entry) => entry.title),
-  "every education entry needs a title",
-);
-requireField(
-  data.volunteer.every((entry) => entry.title),
-  "every volunteer entry needs a title",
-);
+requireField((await stat(photoSource)).isFile(), "basics.photo must point to a file");
 
 const tokens = {
   lang: escapeHtml(data.meta.language ?? "de"),
@@ -203,7 +186,14 @@ await mkdir(paths.outDir, { recursive: true });
 
 await writeFile(paths.html, html, "utf8");
 await cp(paths.styles, join(paths.outDir, "cv.css"));
-await cp(paths.assets, join(paths.outDir, "assets"), { recursive: true });
+
+const photoTarget = resolve(paths.outDir, data.basics.photo);
+requireField(
+  photoTarget.startsWith(paths.outDir + sep),
+  "basics.photo must be inside the output folder",
+);
+await mkdir(dirname(photoTarget), { recursive: true });
+await cp(photoSource, photoTarget);
 
 console.log(`✓ ${paths.html.replace(`${root}/`, "")}`);
 

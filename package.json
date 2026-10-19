@@ -1,0 +1,12 @@
+{
+  "name": "wakako-cv",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Data-driven CV for Wakako Obata: JSON → HTML → PDF",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:html": "node scripts/build.mjs --html-only",
+    "pdf": "node scripts/build.mjs"
+  }
+}

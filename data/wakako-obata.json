@@ -1,0 +1,221 @@
+{
+  "meta": {
+    "language": "de",
+    "title": "Lebenslauf – Wakako Obata",
+    "source": "documents/Lebenslauf_Wakako Obata 2026 2.docx",
+    "updated": "2026-10-12"
+  },
+  "basics": {
+    "name": "Wakako Obata",
+    "tagline": "Mehr Menschen aufs Rad bringen – mit erweiterter Perspektive",
+    "photo": "assets/wakako-obata.jpg",
+    "birth": "22.01.1986 in Kyoto, Japan",
+    "address": "Breisacher Str. 147A, 79110 Freiburg im Breisgau",
+    "phone": "+49 176 7163 5803",
+    "email": "wakako.obata@posteo.de"
+  },
+  "labels": {
+    "summary": "Profil",
+    "experience": "Beruflicher Werdegang",
+    "education": "Studium und Weiterbildung",
+    "volunteer": "Aktivitäten für Verkehrswende",
+    "skills": "Fachliche Kenntnisse",
+    "competencies": "Persönliche Kompetenzen",
+    "languages": "Sprachen",
+    "tools": "EDV",
+    "hobbies": "Hobbys",
+    "page": "Seite 2 / 2"
+  },
+  "summary": [
+    "Kaufmännisch erfahrene Mitarbeiterin mit Berufserfahrung bei JobRad und einem Hersteller von Lastenanhängern sowie in der Kundenbetreuung, Vertriebsunterstützung und Auftragsabwicklung. Serviceorientiert, sorgfältig und strukturiert, mit großer Affinität zur Fahrradwirtschaft.",
+    "Als Fachautorin mehrfach bei der ECF-Radverkehrskonferenz Velo-city und auf Fahrradmessen aktiv."
+  ],
+  "experience": [
+    {
+      "title": "Fachautorin für Verkehrswende und Radverkehr",
+      "company": "Freiberufliche Tätigkeit (auf Projektbasis)",
+      "period": "07/2021 bis heute",
+      "highlights": [
+        "Recherche, Aufbereitung und verständliche Darstellung fachlicher Informationen zu Verkehrswende und Radverkehr",
+        "Beiträge zu Fahrradmessen und der Konferenz „Velo-city“ für japanische und deutsche Fachmedien (u. a. cycleweb.jp, veloplan.de)",
+        "Co-Autorin eines Buches über internationale Fahrradpolitik (Veröffentlichung in Japan, 11/2023); IATSS Award 2024"
+      ]
+    },
+    {
+      "title": "Mitarbeiterin Sales & Partnermanagement",
+      "company": "JobRad GmbH",
+      "location": "Freiburg",
+      "period": "11/2024 bis 12/2025",
+      "highlights": [
+        "Fachliche Zuordnung von Kundenanfragen sowie Prüfung und Bearbeitung berechtigter Änderungsanfragen zu Rahmenverträgen",
+        "Individualisierung von Kundenportalen sowie Pflege und Qualitätssicherung der Bestandsdaten",
+        "Koordination der Optimierung von Prozessabläufen und operativen Systemanforderungen",
+        "Ansprechpartnerin und Koordinatorin für das teaminterne OKR-Set"
+      ]
+    },
+    {
+      "title": "Operativer Einkauf und Vertriebsunterstützung",
+      "company": "CARLA CARGO Engineering GmbH",
+      "location": "Herbolzheim",
+      "period": "05/2023 bis 05/2024",
+      "highlights": [
+        "Bestellung produktionsrelevanter Teile und Pflege von Waren- und Bestandsdaten im ERP-System",
+        "Koordination und Nachverfolgung von Warenflüssen und Lieferprozessen",
+        "Unterstützung des Vertriebs im japanischen Markt"
+      ]
+    },
+    {
+      "title": "Sachbearbeiterin Kundenservice und Logistik",
+      "company": "Sanyo Denki Germany GmbH",
+      "location": "Eschborn",
+      "period": "03/2019 bis 06/2021",
+      "highlights": [
+        "Erfassung und Nachverfolgung von Bestellungen im Warenwirtschaftssystem",
+        "Erstellung von Auftragsbestätigungen, Lieferscheinen und Rechnungen sowie operative Auftragsabwicklung",
+        "Kommunikation mit internationalen Werken (Japan und Philippinen) sowie Erstellung statistischer Auswertungen"
+      ]
+    },
+    {
+      "title": "Assistentin Einkauf / kaufmännische Sachbearbeitung",
+      "company": "NTN Kugellagerfabrik (Deutschland) GmbH",
+      "location": "Mettmann",
+      "period": "09/2015 bis 12/2018",
+      "highlights": [
+        "Ersatzteilbestellungen bei Lieferanten in Japan und Europa",
+        "Kaufmännische Unterstützung bei der Beschaffung von Maschinen",
+        "Pflege von Budgetdatenbanken sowie Unterstützung in der Finanzbuchhaltung",
+        "Übersetzung und Kommunikation zwischen deutschen und japanischen Kolleginnen und Kollegen"
+      ]
+    },
+    {
+      "title": "Kundenservice im Fahrradverleih",
+      "company": "Kyoto Cycling Tour Project",
+      "location": "Kyoto, Japan",
+      "period": "05/2014 bis 08/2014, 03/2013 bis 05/2013",
+      "highlights": [
+        "Fahrradverleih im Tourismussektor inkl. Abrechnung und technischer Einweisung"
+      ]
+    },
+    {
+      "title": "Reiseverkehrsassistentin",
+      "company": "H.I.S. Deutschland Touristik GmbH",
+      "location": "Düsseldorf",
+      "period": "11/2011 bis 09/2012",
+      "highlights": [
+        "Buchung und Vertrieb von Flugtickets und Pauschalreisen",
+        "Beratung zur Verlagerung von Flug- auf Schienenverkehr im Rahmen nachhaltiger Reiseplanung"
+      ]
+    }
+  ],
+  "education": [
+    {
+      "title": "Weiterbildung – Projektmanagement, Data Science und digitale Transformation",
+      "institution": "Habmann Aufstiegsakademie",
+      "period": "08/2026 bis heute",
+      "highlights": [
+        "Projektmanagement: klassische und agile Methoden",
+        "Data Science, KI und Datenanalyse",
+        "Change-Management in IT-gestützten Organisationen",
+        "Big-Data-Analyse und Datensicherheit"
+      ]
+    },
+    {
+      "title": "Zertifikatslehrgang Betrieblicher Mobilitätsmanager",
+      "institution": "IHK Darmstadt",
+      "period": "09/2020 bis 12/2020",
+      "highlights": []
+    },
+    {
+      "title": "B.A. Sozialwissenschaften (Social Science)",
+      "institution": "Ritsumeikan Universität",
+      "location": "Kyoto, Japan",
+      "period": "04/2004 bis 03/2009",
+      "highlights": []
+    },
+    {
+      "title": "Austauschprogramm",
+      "institution": "Albert-Ludwigs-Universität Freiburg",
+      "period": "08/2006 bis 07/2007",
+      "highlights": []
+    }
+  ],
+  "volunteer": [
+    {
+      "title": "Patin der E-Lastenräder der Stadtwerke Offenbach",
+      "organization": "Main-Lastenrad, VCD Hessen e.V.",
+      "period": "10/2021 bis 08/2023",
+      "highlights": [
+        "Pflege der Räder und Unterstützung der Ausleihstationen"
+      ]
+    },
+    {
+      "title": "Mitstreiterin Radentscheid Offenbach",
+      "organization": "Bürgerbegehren, Stadt Offenbach",
+      "period": "02/2020 bis 08/2023",
+      "highlights": [
+        "Arbeiten im Kern-Team und Organisation der Kidical Mass",
+        "Social-Media und Aktionen für Sammlung der Unterschriften"
+      ]
+    }
+  ],
+  "skills": {
+    "technical": [
+      "Kundenservice",
+      "Kundenkommunikation",
+      "Vorgangsbearbeitung",
+      "Auftragsbearbeitung",
+      "Bestellabwicklung",
+      "Daten- sowie Stammdatenpflege",
+      "ERP-/CRM-Systeme",
+      "Prozesskoordination",
+      "Statistische Auswertungen",
+      "Strukturierte Dokumentation",
+      "Internationale Kommunikation"
+    ],
+    "personal": [
+      "Teamfähigkeit",
+      "Serviceorientierung",
+      "Strukturierte und sorgfältige Arbeitsweise",
+      "Selbstständigkeit",
+      "Lernbereitschaft"
+    ],
+    "tools": [
+      "Microsoft 365 + Confluence",
+      "Salesforce / Odoo / Miro",
+      "myfactory",
+      "WordPress",
+      "Sage",
+      "IBM Lotus Notes",
+      "Amadeus"
+    ]
+  },
+  "languages": [
+    {
+      "name": "Deutsch",
+      "level": 4,
+      "maxLevel": 5
+    },
+    {
+      "name": "Englisch",
+      "level": 3,
+      "maxLevel": 5
+    },
+    {
+      "name": "Japanisch",
+      "level": 5,
+      "maxLevel": 5
+    }
+  ],
+  "hobbies": [
+    "Aktivitäten bei den Vereinen (ADFC, VCD)",
+    "Testen neuer Lastenräder",
+    "Reisen mit Faltrad x Bahn",
+    "Japanische Süßigkeiten und Tees zubereiten und genießen",
+    "Miso herstellen",
+    "Luna Yoga"
+  ],
+  "closing": {
+    "place": "Freiburg im Breisgau",
+    "date": "12.10.2026"
+  }
+}

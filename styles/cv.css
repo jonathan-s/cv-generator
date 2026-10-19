@@ -274,76 +274,38 @@ p {
 
 /* ---- short side-by-side sections ---------------------------------------- */
 
-.triple-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0 9mm;
-  margin-top: 5.8mm;
-}
+/* ---- extras: languages, tools, hobbies -------------------------------- */
 
-.triple-grid .section {
-  margin-top: 0;
-}
-
-.triple-grid .section__title {
-  margin-bottom: 2.4mm;
-}
-
-/* ---- plain one-column list ---------------------------------------------- */
-
-.list {
+.facts {
   margin: 0;
   padding: 0;
-  list-style: none;
 }
 
-.list li {
-  margin: 0 0 1mm;
-  break-inside: avoid;
+.fact {
+  margin: 0 0 2.2mm;
 }
 
-.list li:last-child {
+.fact:last-child {
   margin-bottom: 0;
 }
 
-/* ---- languages ----------------------------------------------------------- */
+.fact dt {
+  display: inline;
+  margin-right: 1.5mm;
+  color: var(--ink);
+  font-size: 8.2pt;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 
-.languages {
+.fact dt::after {
+  content: ":\00a0";
+}
+
+.fact dd {
+  display: inline;
   margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.languages li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 3mm;
-  margin-bottom: 1.1mm;
-}
-
-.languages li:last-child {
-  margin-bottom: 0;
-}
-
-.dots {
-  display: inline-flex;
-  flex: none;
-  gap: 0.9mm;
-}
-
-.dot {
-  display: block;
-  width: 1.9mm;
-  height: 1.9mm;
-  border: 0.35pt solid var(--rule-strong);
-  border-radius: 50%;
-  background: transparent;
-}
-
-.dot--on {
-  border-color: var(--accent);
-  background: var(--accent);
 }
 
 /* ---- second-page banner -------------------------------------------------- */

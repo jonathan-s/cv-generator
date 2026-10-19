@@ -62,22 +62,23 @@
         <ul class="columns columns--2">{{personalSkills}}</ul>
       </section>
 
-      <div class="triple-grid">
-        <section class="section">
-          <h2 class="section__title">{{labels.languages}}</h2>
-          <ul class="languages">{{languages}}</ul>
-        </section>
-
-        <section class="section">
-          <h2 class="section__title">{{labels.tools}}</h2>
-          <ul class="list">{{tools}}</ul>
-        </section>
-
-        <section class="section">
-          <h2 class="section__title">{{labels.hobbies}}</h2>
-          <ul class="list">{{hobbies}}</ul>
-        </section>
-      </div>
+      <section class="section">
+        <h2 class="section__title">{{labels.extras}}</h2>
+        <dl class="facts">
+          <div class="fact">
+            <dt>{{labels.languages}}</dt>
+            <dd>{{languagesInline}}</dd>
+          </div>
+          <div class="fact">
+            <dt>{{labels.tools}}</dt>
+            <dd>{{toolsInline}}</dd>
+          </div>
+          <div class="fact">
+            <dt>{{labels.hobbies}}</dt>
+            <dd>{{hobbiesInline}}</dd>
+          </div>
+        </dl>
+      </section>
 
       <p class="closing">{{closingPlace}}, {{closingDate}}</p>
     </article>

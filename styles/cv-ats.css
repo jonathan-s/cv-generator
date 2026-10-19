@@ -1,0 +1,174 @@
+/* ==========================================================================
+   ATS CV variant
+   Deliberately plain: one column, text only, standard headings, no photo.
+   Optimised for PDF text extraction and German-market ATS parsing.
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: #e9e5e1;
+  color: #111111;
+  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  font-size: 9.7pt;
+  line-height: 1.34;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "clig" 0;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+p {
+  margin: 0 0 2mm;
+  orphans: 3;
+  widows: 3;
+}
+
+.ats-page {
+  width: 210mm;
+  min-height: 297mm;
+  margin: 10mm auto;
+  padding: 15mm;
+  background: #ffffff;
+  box-shadow: 0 2px 16px rgba(30, 22, 16, 0.13);
+}
+
+.ats-header {
+  margin-bottom: 5mm;
+}
+
+.ats-name {
+  margin: 0 0 2mm;
+  font-size: 19pt;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+}
+
+.ats-tagline {
+  margin: 0 0 2.5mm;
+  font-size: 10pt;
+}
+
+.ats-contact {
+  margin: 0;
+  font-size: 8.8pt;
+  line-height: 1.45;
+}
+
+.ats-section {
+  margin-top: 4.2mm;
+}
+
+.ats-section h2 {
+  margin: 0 0 2mm;
+  padding-bottom: 0.8mm;
+  border-bottom: 0.5pt solid #111111;
+  font-size: 10.2pt;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+.ats-entry {
+  margin: 0 0 2.6mm;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.ats-entry__title {
+  margin: 0;
+  font-size: 10.2pt;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.ats-entry__meta {
+  margin: 0.4mm 0 0;
+  font-size: 9.2pt;
+}
+
+.ats-bullets {
+  margin: 1.2mm 0 0;
+  padding-left: 5mm;
+}
+
+.ats-bullets li {
+  margin: 0 0 0.6mm;
+}
+
+.ats-bullets li:last-child {
+  margin-bottom: 0;
+}
+
+.ats-summary p + p {
+  margin-top: 1.5mm;
+}
+
+.ats-closing {
+  margin-top: 7mm;
+  font-size: 9.2pt;
+}
+
+/* ---- print --------------------------------------------------------------- */
+
+@page {
+  size: A4;
+  margin: 15mm;
+}
+
+@media print {
+  html,
+  body {
+    background: #ffffff;
+  }
+
+  body {
+    margin: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .ats-page {
+    width: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+}
+
+/* ---- small screens ------------------------------------------------------- */
+
+@media screen and (max-width: 900px) {
+  body {
+    background: #ffffff;
+  }
+
+  .ats-page {
+    width: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 12mm;
+    box-shadow: none;
+  }
+}

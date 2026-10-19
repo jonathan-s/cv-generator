@@ -1,17 +1,19 @@
 #!/usr/bin/env node
 /**
- * Build the CV from JSON:
- *   data/wakako-obata.json  ->  dist/wakako-obata.html  ->  dist/wakako-obata.pdf
+ * Build both CV variants from the same JSON:
  *
- * No external dependencies. The PDF is printed with headless Chrome using the
- * print rules in styles/cv.css (@page A4, two fixed page sheets).
+ *   data/wakako-obata.json
+ *     -> dist/wakako-obata.html      + dist/wakako-obata.pdf      (designed)
+ *     -> dist/wakako-obata-ats.html  + dist/wakako-obata-ats.pdf  (ATS)
+ *
+ * No external dependencies. The PDFs are printed with headless Chrome.
  */
 
 import { cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { dirname, join, resolve, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { validateCv } from "./lib/validate.mjs";
@@ -21,14 +23,33 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const paths = {
   data: join(root, "data", "wakako-obata.json"),
-  template: join(root, "templates", "cv.html"),
-  styles: join(root, "styles", "cv.css"),
   outDir: join(root, "dist"),
-  html: join(root, "dist", "wakako-obata.html"),
-  pdf: join(root, "dist", "wakako-obata.pdf"),
 };
 
 const htmlOnly = process.argv.includes("--html-only");
+
+const variants = [
+  {
+    key: "designed",
+    label: "Designed",
+    template: join(root, "templates", "cv.html"),
+    stylesheet: join(root, "styles", "cv.css"),
+    stylesheetName: "cv.css",
+    html: join(paths.outDir, "wakako-obata.html"),
+    pdf: join(paths.outDir, "wakako-obata.pdf"),
+    expectedPages: 2,
+  },
+  {
+    key: "ats",
+    label: "ATS",
+    template: join(root, "templates", "cv-ats.html"),
+    stylesheet: join(root, "styles", "cv-ats.css"),
+    stylesheetName: "cv-ats.css",
+    html: join(paths.outDir, "wakako-obata-ats.html"),
+    pdf: join(paths.outDir, "wakako-obata-ats.pdf"),
+    expectedPages: 2,
+  },
+];
 
 /* -------------------------------------------------------------------------- */
 /* helpers                                                                    */
@@ -54,6 +75,22 @@ const requireField = (condition, message) => {
 const renderListItems = (items = []) =>
   items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
 
+const renderInlineList = (items = [], separator = " · ") =>
+  items.map((item) => escapeHtml(item)).join(separator);
+
+const languageLevel = (language) =>
+  (typeof language.levelLabel === "string" && language.levelLabel.trim()) ||
+  `${language.level}/${language.maxLevel ?? 5}`;
+
+const renderLanguagesInline = (languages = [], separator = " · ") =>
+  languages
+    .map(
+      (language) =>
+        `${escapeHtml(language.name)} (${escapeHtml(languageLevel(language))})`,
+    )
+    .join(separator);
+
+/* designed layout entries: title + right-aligned date, company below */
 const renderEntries = (entries = []) =>
   entries
     .map((entry) => {
@@ -74,6 +111,28 @@ const renderEntries = (entries = []) =>
       : ""
   }
 </article>`;
+    })
+    .join("\n");
+
+/* ATS layout entries: title, company/location/date, bullets in DOM order */
+const renderEntriesAts = (entries = []) =>
+  entries
+    .map((entry) => {
+      const organisation =
+        entry.company ?? entry.organization ?? entry.institution ?? "";
+      const meta = [organisation, entry.location].filter(Boolean).join(", ");
+      const line = [meta, entry.period].filter(Boolean).join(" | ");
+      const highlights = entry.highlights ?? [];
+
+      return `<div class="ats-entry">
+  <h3 class="ats-entry__title">${escapeHtml(entry.title)}</h3>
+  ${line ? `<p class="ats-entry__meta">${escapeHtml(line)}</p>` : ""}
+  ${
+    highlights.length
+      ? `<ul class="ats-bullets">${renderListItems(highlights)}</ul>`
+      : ""
+  }
+</div>`;
     })
     .join("\n");
 
@@ -103,23 +162,27 @@ const renderContact = (basics) => {
     .join("\n");
 };
 
-const renderLanguages = (languages = []) =>
-  languages
-    .map((language) => {
-      const max = language.maxLevel ?? 5;
-      const level = Math.max(0, Math.min(Number(language.level) || 0, max));
-      const dots = Array.from(
-        { length: max },
-        (_, index) =>
-          `<span class="dot${index < level ? " dot--on" : ""}" aria-hidden="true"></span>`,
-      ).join("");
+const renderContactInline = (basics) => {
+  const items = [];
 
-      return `<li>
-  <span class="language__name">${escapeHtml(language.name)}</span>
-  <span class="dots" role="img" aria-label="${escapeHtml(language.name)}: ${level} von ${max}">${dots}</span>
-</li>`;
-    })
-    .join("\n");
+  if (basics.birth) items.push(escapeHtml(basics.birth));
+  if (basics.address) items.push(escapeHtml(basics.address));
+
+  if (basics.phone) {
+    const phoneHref = String(basics.phone).replace(/[^\d+]/g, "");
+    items.push(
+      `<a href="tel:${escapeHtml(phoneHref)}">${escapeHtml(basics.phone)}</a>`,
+    );
+  }
+
+  if (basics.email) {
+    items.push(
+      `<a href="mailto:${escapeHtml(basics.email)}">${escapeHtml(basics.email)}</a>`,
+    );
+  }
+
+  return items.join(" | ");
+};
 
 /* -------------------------------------------------------------------------- */
 /* validate + render                                                          */
@@ -129,9 +192,7 @@ const data = JSON.parse(await readFile(paths.data, "utf8"));
 
 const validationErrors = validateCv(data);
 if (validationErrors.length) {
-  throw new Error(
-    `CV data error:\n- ${validationErrors.join("\n- ")}`,
-  );
+  throw new Error(`CV data error:\n- ${validationErrors.join("\n- ")}`);
 }
 
 const photoSource = resolve(root, data.basics.photo);
@@ -143,24 +204,37 @@ requireField(
   existsSync(photoSource),
   `photo not found: ${data.basics.photo}`,
 );
-requireField((await stat(photoSource)).isFile(), "basics.photo must point to a file");
+requireField(
+  (await stat(photoSource)).isFile(),
+  "basics.photo must point to a file",
+);
 
 const tokens = {
   lang: escapeHtml(data.meta.language ?? "de"),
   title: escapeHtml(data.meta.title ?? `Lebenslauf – ${data.basics.name}`),
   name: escapeHtml(data.basics.name),
   tagline: escapeHtml(data.basics.tagline ?? ""),
-  photo: escapeHtml(data.basics.photo),
+  photo: escapeHtml(encodeURI(data.basics.photo)),
   contact: renderContact(data.basics),
-  summary: data.summary.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join("\n"),
+  contactInline: renderContactInline(data.basics),
+  summary: data.summary
+    .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
+    .join("\n"),
   experience: renderEntries(data.experience),
   education: renderEntries(data.education),
   volunteer: renderEntries(data.volunteer),
+  experienceAts: renderEntriesAts(data.experience),
+  educationAts: renderEntriesAts(data.education),
+  volunteerAts: renderEntriesAts(data.volunteer),
   technicalSkills: renderListItems(data.skills.technical ?? []),
   personalSkills: renderListItems(data.skills.personal ?? []),
-  tools: renderListItems(data.skills.tools ?? []),
-  languages: renderLanguages(data.languages),
-  hobbies: renderListItems(data.hobbies),
+  technicalInlineAts: renderInlineList(data.skills.technical ?? [], ", "),
+  personalInlineAts: renderInlineList(data.skills.personal ?? [], ", "),
+  languagesInline: renderLanguagesInline(data.languages, " · "),
+  languagesInlineAts: renderLanguagesInline(data.languages, ", "),
+  toolsInline: renderInlineList(data.skills.tools ?? [], " · "),
+  toolsInlineAts: renderInlineList(data.skills.tools ?? [], ", "),
+  hobbiesInline: renderInlineList(data.hobbies, " · "),
   closingPlace: escapeHtml(data.closing.place ?? ""),
   closingDate: escapeHtml(data.closing.date ?? ""),
 };
@@ -169,23 +243,39 @@ for (const [key, value] of Object.entries(data.labels)) {
   tokens[`labels.${key}`] = escapeHtml(value);
 }
 
-const template = await readFile(paths.template, "utf8");
-const html = template.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (match, key) => {
-  if (!(key in tokens)) {
-    throw new Error(`Unknown template token ${match} in templates/cv.html`);
-  }
-  return tokens[key];
-});
+const renderTemplate = async (variant) => {
+  const template = await readFile(variant.template, "utf8");
+  const html = template.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (match, key) => {
+    if (!(key in tokens)) {
+      throw new Error(
+        `Unknown template token ${match} in ${relative(root, variant.template)}`,
+      );
+    }
+    return tokens[key];
+  });
 
-if (/\{\{[^}]+\}\}/.test(html)) {
-  throw new Error("Unresolved template tokens remain in the generated HTML");
-}
+  if (/\{\{[^}]+\}\}/.test(html)) {
+    throw new Error(
+      `Unresolved template tokens remain in ${relative(root, variant.template)}`,
+    );
+  }
+
+  return html;
+};
+
+/* -------------------------------------------------------------------------- */
+/* write HTML + assets                                                       */
+/* -------------------------------------------------------------------------- */
 
 await rm(paths.outDir, { recursive: true, force: true });
 await mkdir(paths.outDir, { recursive: true });
 
-await writeFile(paths.html, html, "utf8");
-await cp(paths.styles, join(paths.outDir, "cv.css"));
+for (const variant of variants) {
+  const html = await renderTemplate(variant);
+  await writeFile(variant.html, html, "utf8");
+  await cp(variant.stylesheet, join(paths.outDir, variant.stylesheetName));
+  console.log(`✓ ${relative(root, variant.html)}`);
+}
 
 const photoTarget = resolve(paths.outDir, data.basics.photo);
 requireField(
@@ -194,8 +284,6 @@ requireField(
 );
 await mkdir(dirname(photoTarget), { recursive: true });
 await cp(photoSource, photoTarget);
-
-console.log(`✓ ${paths.html.replace(`${root}/`, "")}`);
 
 if (htmlOnly) process.exit(0);
 
@@ -222,35 +310,6 @@ if (!chrome) {
   );
 }
 
-const profileDir = join(tmpdir(), `wakako-cv-chrome-${process.pid}`);
-
-try {
-  await execFileAsync(
-    chrome,
-    [
-      "--headless=new",
-      "--disable-gpu",
-      "--hide-scrollbars",
-      "--no-first-run",
-      "--no-default-browser-check",
-      "--no-pdf-header-footer",
-      "--run-all-compositor-stages-before-draw",
-      "--virtual-time-budget=5000",
-      `--user-data-dir=${profileDir}`,
-      `--print-to-pdf=${paths.pdf}`,
-      pathToFileURL(paths.html).href,
-    ],
-    { timeout: 120_000, maxBuffer: 10 * 1024 * 1024 },
-  );
-} finally {
-  await rm(profileDir, { recursive: true, force: true });
-}
-
-const pdfStat = await stat(paths.pdf);
-requireField(pdfStat.size > 1000, "generated PDF is unexpectedly small");
-
-let pageCount = null;
-
 const gsCandidates = [
   process.env.GS_PATH,
   "/opt/homebrew/bin/gs",
@@ -259,48 +318,111 @@ const gsCandidates = [
 ].filter(Boolean);
 const ghostscript = gsCandidates.find((candidate) => existsSync(candidate));
 
-if (ghostscript) {
-  const escapedPath = paths.pdf
-    .replace(/\\/g, "\\\\")
-    .replace(/\(/g, "\\(")
-    .replace(/\)/g, "\\)");
-  try {
-    const { stdout } = await execFileAsync(ghostscript, [
-      "-q",
-      "-dNODISPLAY",
-      "-dNOSAFER",
-      "-c",
-      `(${escapedPath}) (r) file runpdfbegin pdfpagecount = quit`,
-    ]);
-    const parsed = Number.parseInt(stdout.trim(), 10);
-    if (Number.isFinite(parsed)) pageCount = parsed;
-  } catch {
-    /* page count is informational only */
+async function getPdfPageCount(pdfPath) {
+  if (ghostscript) {
+    const escapedPath = pdfPath
+      .replace(/\\/g, "\\\\")
+      .replace(/\(/g, "\\(")
+      .replace(/\)/g, "\\)");
+
+    try {
+      const { stdout } = await execFileAsync(ghostscript, [
+        "-q",
+        "-dNODISPLAY",
+        "-dNOSAFER",
+        "-c",
+        `(${escapedPath}) (r) file runpdfbegin pdfpagecount = quit`,
+      ]);
+      const parsed = Number.parseInt(stdout.trim(), 10);
+      if (Number.isFinite(parsed)) return parsed;
+    } catch {
+      /* fall through to mdls */
+    }
   }
+
+  if (process.platform === "darwin") {
+    try {
+      const { stdout } = await execFileAsync("mdls", [
+        "-name",
+        "kMDItemNumberOfPages",
+        "-raw",
+        pdfPath,
+      ]);
+      const parsed = Number.parseInt(stdout.trim(), 10);
+      if (Number.isFinite(parsed)) return parsed;
+    } catch {
+      /* page count is informational only */
+    }
+  }
+
+  return null;
 }
 
-if (pageCount === null && process.platform === "darwin") {
-  try {
-    const { stdout } = await execFileAsync("mdls", [
-      "-name",
-      "kMDItemNumberOfPages",
-      "-raw",
-      paths.pdf,
-    ]);
-    const parsed = Number.parseInt(stdout.trim(), 10);
-    if (Number.isFinite(parsed)) pageCount = parsed;
-  } catch {
-    /* page count is informational only */
-  }
-}
-
-const sizeKb = Math.round(pdfStat.size / 1024);
-console.log(
-  `✓ ${paths.pdf.replace(`${root}/`, "")} (${pageCount ? `${pageCount} pages, ` : ""}${sizeKb} KB)`,
-);
-
-if (pageCount !== null && pageCount !== 2) {
-  console.warn(
-    `⚠ expected a two-page CV, but the PDF has ${pageCount} pages — check the spacing in styles/cv.css`,
+for (const variant of variants) {
+  const profileDir = join(
+    tmpdir(),
+    `wakako-cv-chrome-${process.pid}-${variant.key}`,
   );
+
+  try {
+    await execFileAsync(
+      chrome,
+      [
+        "--headless=new",
+        "--disable-gpu",
+        "--hide-scrollbars",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--no-pdf-header-footer",
+        "--run-all-compositor-stages-before-draw",
+        "--virtual-time-budget=5000",
+        `--user-data-dir=${profileDir}`,
+        `--print-to-pdf=${variant.pdf}`,
+        pathToFileURL(variant.html).href,
+      ],
+      { timeout: 120_000, maxBuffer: 10 * 1024 * 1024 },
+    );
+  } finally {
+    await rm(profileDir, { recursive: true, force: true });
+  }
+
+  const info = await stat(variant.pdf);
+  requireField(info.size > 1000, `${variant.label} PDF is unexpectedly small`);
+
+  variant.pageCount = await getPdfPageCount(variant.pdf);
+  variant.sizeKb = Math.round(info.size / 1024);
+
+  console.log(
+    `✓ ${relative(root, variant.pdf)} (${variant.pageCount ? `${variant.pageCount} pages, ` : ""}${variant.sizeKb} KB)`,
+  );
+
+  if (
+    variant.pageCount !== null &&
+    variant.pageCount !== variant.expectedPages
+  ) {
+    console.warn(
+      `⚠ ${variant.label} expected ${variant.expectedPages} pages, got ${variant.pageCount} — check ${relative(root, variant.stylesheet)}`,
+    );
+  }
 }
+
+const manifest = {
+  builtAt: new Date().toISOString(),
+  variants: Object.fromEntries(
+    variants.map((variant) => [
+      variant.key,
+      {
+        label: variant.label,
+        html: relative(paths.outDir, variant.html),
+        pdf: relative(paths.outDir, variant.pdf),
+        pageCount: variant.pageCount,
+        sizeKb: variant.sizeKb,
+      },
+    ]),
+  ),
+};
+
+await writeFile(
+  join(paths.outDir, "build.json"),
+  `${JSON.stringify(manifest, null, 2)}\n`,
+);

@@ -24,7 +24,8 @@
     "languages": "Sprachen",
     "tools": "EDV",
     "hobbies": "Hobbys",
-    "page": "Seite 2 / 2"
+    "page": "Seite 2 / 2",
+    "extras": "Weitere Kenntnisse"
   },
   "summary": [
     "Kaufmännisch erfahrene Mitarbeiterin mit Berufserfahrung bei JobRad und einem Hersteller von Lastenanhängern sowie in der Kundenbetreuung, Vertriebsunterstützung und Auftragsabwicklung. Serviceorientiert, sorgfältig und strukturiert, mit großer Affinität zur Fahrradwirtschaft.",
@@ -193,17 +194,20 @@
     {
       "name": "Deutsch",
       "level": 4,
-      "maxLevel": 5
+      "maxLevel": 5,
+      "levelLabel": "verhandlungssicher"
     },
     {
       "name": "Englisch",
       "level": 3,
-      "maxLevel": 5
+      "maxLevel": 5,
+      "levelLabel": "gute Kenntnisse"
     },
     {
       "name": "Japanisch",
       "level": 5,
-      "maxLevel": 5
+      "maxLevel": 5,
+      "levelLabel": "Muttersprache"
     }
   ],
   "hobbies": [

@@ -11,6 +11,7 @@ const DEFAULT_LABELS = {
   volunteer: "Aktivitäten für Verkehrswende",
   skills: "Fachliche Kenntnisse",
   competencies: "Persönliche Kompetenzen",
+  extras: "Weitere Kenntnisse",
   languages: "Sprachen",
   tools: "EDV",
   hobbies: "Hobbys",
@@ -24,6 +25,7 @@ const LABEL_FIELDS = [
   ["volunteer", "Volunteer work"],
   ["skills", "Technical skills"],
   ["competencies", "Personal competencies"],
+  ["extras", "Further skills"],
   ["languages", "Languages"],
   ["tools", "Software / tools"],
   ["hobbies", "Hobbies"],
@@ -57,11 +59,26 @@ const ENTRY_SECTIONS = [
   },
 ];
 
+const VARIANT_FILES = {
+  designed: {
+    html: "/preview/wakako-obata.html",
+    pdf: "/preview/wakako-obata.pdf",
+    label: "Designed",
+  },
+  ats: {
+    html: "/preview/wakako-obata-ats.html",
+    pdf: "/preview/wakako-obata-ats.pdf",
+    label: "ATS",
+  },
+};
+
 const state = {
   data: null,
   dirty: false,
   saving: false,
   revision: 0,
+  variant: "designed",
+  variants: null,
 };
 
 let photoThumb = null;
@@ -76,6 +93,8 @@ const dom = {
   preview: document.getElementById("preview"),
   previewMeta: document.getElementById("preview-meta"),
   pdfLink: document.getElementById("pdf-link"),
+  variantDesigned: document.getElementById("variant-designed"),
+  variantAts: document.getElementById("variant-ats"),
   jumpNav: document.getElementById("jump-nav"),
 };
 
@@ -278,6 +297,7 @@ function normalizeData(input) {
     if (!language || typeof language !== "object") continue;
     if (!Number.isFinite(language.level)) language.level = 0;
     if (!Number.isFinite(language.maxLevel)) language.maxLevel = 5;
+    if (typeof language.levelLabel !== "string") language.levelLabel = "";
   }
 
   data.hobbies = Array.isArray(data.hobbies) ? data.hobbies : [];
@@ -650,6 +670,13 @@ function renderLanguages(data) {
         1,
         10,
       ),
+      textInput(
+        language.levelLabel ?? "",
+        (value) => {
+          language.levelLabel = value;
+        },
+        "e.g. verhandlungssicher",
+      ),
       iconButton(
         "×",
         "Remove language",
@@ -667,7 +694,7 @@ function renderLanguages(data) {
   return card(
     "languages",
     "Languages",
-    "Levels are rendered as filled dots (level of maxLevel).",
+    "Level labels are shown as text in the ATS variant and in the Weitere Kenntnisse block.",
     [
       h(
         "div",
@@ -678,13 +705,14 @@ function renderLanguages(data) {
           h("span", {}, "Language"),
           h("span", {}, "Level"),
           h("span", {}, "Max"),
+          h("span", {}, "Level label"),
           h("span", {}),
         ),
         ...rows,
         button(
           "Add language",
           () => {
-            data.languages.push({ name: "", level: 3, maxLevel: 5 });
+            data.languages.push({ name: "", level: 3, maxLevel: 5, levelLabel: "" });
             markDirty();
             render();
           },
@@ -699,7 +727,7 @@ function renderHobbies(data) {
   return card(
     "hobbies",
     "Hobbies",
-    "Rendered in the bottom three-column block on page 2.",
+    "Rendered in the Weitere Kenntnisse block on page 2. Omitted from the ATS variant.",
     [
       listEditor(data.hobbies, {
         addLabel: "Add hobby",
@@ -865,20 +893,25 @@ async function load() {
   setStatus("Loading…", "busy");
 
   try {
-    const response = await fetch("/api/cv", { cache: "no-store" });
-    const payload = await response.json().catch(() => ({}));
+    const [cvResponse, buildResponse] = await Promise.all([
+      fetch("/api/cv", { cache: "no-store" }),
+      fetch("/api/build", { cache: "no-store" }),
+    ]);
+    const payload = await cvResponse.json().catch(() => ({}));
+    const build = await buildResponse.json().catch(() => ({ variants: {} }));
 
-    if (!response.ok) {
+    if (!cvResponse.ok) {
       throw new Error(
-        payload.error || `Could not load the CV data (${response.status}).`,
+        payload.error || `Could not load the CV data (${cvResponse.status}).`,
       );
     }
 
     state.data = normalizeData(payload);
+    state.variants = build.variants ?? {};
     state.dirty = false;
     state.revision = 0;
     render();
-    refreshPreview();
+    setVariant(state.variant);
     setStatus("Loaded", "ok");
   } catch (error) {
     state.data = null;
@@ -913,24 +946,30 @@ async function save() {
       throw error;
     }
 
-    const meta = [];
-    if (payload.pageCount) meta.push(`${payload.pageCount} pages`);
-    if (payload.sizeKb) meta.push(`${payload.sizeKb} KB`);
-
-    dom.previewMeta.textContent = meta.join(" · ");
-    dom.pdfLink.href = `/preview/wakako-obata.pdf?v=${Date.now()}`;
+    state.variants = payload.variants ?? state.variants;
+    dom.pdfLink.href = `${VARIANT_FILES[state.variant].pdf}?v=${Date.now()}`;
     refreshPreview();
+    updatePreviewMeta(payload);
     updatePhotoPreview();
 
     const newerEdits = state.revision !== revisionAtSave;
     state.dirty = newerEdits;
+    const summary = Object.values(payload.variants ?? {})
+      .map(
+        (variant) =>
+          `${variant.label ?? "Variant"}: ${variant.pageCount ?? "?"} pages`,
+      )
+      .join(" · ");
 
     if (newerEdits) {
       setStatus("Saved snapshot; newer edits are not in the PDF yet.", "warn");
     } else if (payload.warnings) {
-      setStatus(`Saved · ${payload.warnings}`, "warn");
+      setStatus(
+        `Saved${summary ? ` · ${summary}` : ""} · ${payload.warnings}`,
+        "warn",
+      );
     } else {
-      setStatus(`Saved${meta.length ? ` · ${meta.join(" · ")}` : ""}`, "ok");
+      setStatus(`Saved${summary ? ` · ${summary}` : ""}`, "ok");
     }
   } catch (error) {
     const saved = Boolean(error.payload?.saved);
@@ -987,20 +1026,23 @@ async function rebuild() {
       );
     }
 
-    const meta = [];
-    if (payload.pageCount) meta.push(`${payload.pageCount} pages`);
-    if (payload.sizeKb) meta.push(`${payload.sizeKb} KB`);
-
-    dom.previewMeta.textContent = meta.join(" · ");
-    dom.pdfLink.href = `/preview/wakako-obata.pdf?v=${Date.now()}`;
+    state.variants = payload.variants ?? state.variants;
+    dom.pdfLink.href = `${VARIANT_FILES[state.variant].pdf}?v=${Date.now()}`;
     refreshPreview();
+    updatePreviewMeta(payload);
     updatePhotoPreview();
 
+    const summary = Object.values(payload.variants ?? {})
+      .map(
+        (variant) =>
+          `${variant.label ?? "Variant"}: ${variant.pageCount ?? "?"} pages`,
+      )
+      .join(" · ");
     const suffix = state.dirty
       ? " · unsaved form changes are not included"
       : "";
     setStatus(
-      `Rebuilt${meta.length ? ` · ${meta.join(" · ")}` : ""}${suffix}`,
+      `Rebuilt${summary ? ` · ${summary}` : ""}${suffix}`,
       state.dirty ? "warn" : "ok",
     );
   } catch (error) {
@@ -1023,7 +1065,38 @@ async function reload() {
 }
 
 function refreshPreview() {
-  dom.preview.src = `/preview/wakako-obata.html?v=${Date.now()}`;
+  dom.preview.src = `${VARIANT_FILES[state.variant].html}?v=${Date.now()}`;
+}
+
+function setVariant(variant) {
+  if (!VARIANT_FILES[variant]) return;
+
+  state.variant = variant;
+  const isDesigned = variant === "designed";
+
+  dom.variantDesigned.classList.toggle("is-active", isDesigned);
+  dom.variantAts.classList.toggle("is-active", !isDesigned);
+  dom.variantDesigned.setAttribute("aria-pressed", String(isDesigned));
+  dom.variantAts.setAttribute("aria-pressed", String(!isDesigned));
+  dom.pdfLink.href = `${VARIANT_FILES[variant].pdf}?v=${Date.now()}`;
+
+  updatePreviewMeta();
+  refreshPreview();
+}
+
+function updatePreviewMeta(payload = null) {
+  const variants = payload?.variants ?? state.variants;
+  const variant = variants?.[state.variant];
+
+  if (!variant) {
+    dom.previewMeta.textContent = "";
+    return;
+  }
+
+  const parts = [];
+  if (variant.pageCount) parts.push(`${variant.pageCount} pages`);
+  if (variant.sizeKb) parts.push(`${variant.sizeKb} KB`);
+  dom.previewMeta.textContent = parts.join(" · ");
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1035,6 +1108,8 @@ function init() {
   dom.reload.addEventListener("click", reload);
   dom.rebuild.addEventListener("click", rebuild);
   dom.refresh.addEventListener("click", () => refreshPreview());
+  dom.variantDesigned.addEventListener("click", () => setVariant("designed"));
+  dom.variantAts.addEventListener("click", () => setVariant("ats"));
 
   dom.form.addEventListener("submit", (event) => {
     event.preventDefault();

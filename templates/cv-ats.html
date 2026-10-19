@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Lebenslauf von {{name}}">
+  <meta name="author" content="{{name}}">
+  <title>{{title}} – ATS</title>
+  <link rel="stylesheet" href="./cv-ats.css">
+</head>
+<body>
+  <main class="ats-page">
+    <header class="ats-header">
+      <h1 class="ats-name">{{name}}</h1>
+      <p class="ats-tagline">{{tagline}}</p>
+      <p class="ats-contact">{{contactInline}}</p>
+    </header>
+
+    <section class="ats-section">
+      <h2>{{labels.summary}}</h2>
+      <div class="ats-summary">{{summary}}</div>
+    </section>
+
+    <section class="ats-section">
+      <h2>{{labels.experience}}</h2>
+      {{experienceAts}}
+    </section>
+
+    <section class="ats-section">
+      <h2>{{labels.education}}</h2>
+      {{educationAts}}
+    </section>
+
+    <section class="ats-section">
+      <h2>{{labels.volunteer}}</h2>
+      {{volunteerAts}}
+    </section>
+
+    <section class="ats-section">
+      <h2>{{labels.skills}}</h2>
+      <p>{{technicalInlineAts}}</p>
+    </section>
+
+    <section class="ats-section">
+      <h2>{{labels.competencies}}</h2>
+      <p>{{personalInlineAts}}</p>
+    </section>
+
+    <section class="ats-section">
+      <h2>{{labels.languages}}</h2>
+      <p>{{languagesInlineAts}}</p>
+    </section>
+
+    <section class="ats-section">
+      <h2>{{labels.tools}}</h2>
+      <p>{{toolsInlineAts}}</p>
+    </section>
+
+    <p class="ats-closing">{{closingPlace}}, {{closingDate}}</p>
+  </main>
+</body>
+</html>

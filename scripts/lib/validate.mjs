@@ -11,6 +11,7 @@ export const LABEL_KEYS = [
   "volunteer",
   "skills",
   "competencies",
+  "extras",
   "languages",
   "tools",
   "hobbies",
@@ -140,6 +141,9 @@ export function validateCv(data) {
       }
       if (!Number.isFinite(language.maxLevel) || language.maxLevel < 1) {
         errors.push(`${at}.maxLevel must be a positive number.`);
+      }
+      if (language.levelLabel != null && !isString(language.levelLabel)) {
+        errors.push(`${at}.levelLabel must be a string.`);
       }
     });
   }

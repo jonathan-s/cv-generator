@@ -2,7 +2,7 @@
 /**
  * Local CV editor.
  *
- *   npm run editor   ->  http://127.0.0.1:4173
+ *   npm run editor   ->  http://127.0.0.1:8080
  *
  * The editor is a plain HTML/CSS/JS page. Saving sends the whole JSON document
  * to PUT /api/cv, which:
@@ -31,10 +31,13 @@ const paths = {
   dist: join(root, "dist"),
   html: join(root, "dist", "wakako-obata.html"),
   pdf: join(root, "dist", "wakako-obata.pdf"),
+  atsHtml: join(root, "dist", "wakako-obata-ats.html"),
+  atsPdf: join(root, "dist", "wakako-obata-ats.pdf"),
+  manifest: join(root, "dist", "build.json"),
 };
 
 const HOST = process.env.HOST || "127.0.0.1";
-const PORT = Number(process.env.PORT) || 4173;
+const PORT = Number(process.env.PORT) || 8080;
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
 
 const MIME = {
@@ -122,9 +125,28 @@ async function runBuild() {
       },
     );
 
+    let manifest = { variants: {} };
+    try {
+      manifest = JSON.parse(await readFile(paths.manifest, "utf8"));
+    } catch {
+      /* the build should write this, but do not fail the save over it */
+    }
+
+    const variants = {};
+    for (const [key, value] of Object.entries(manifest.variants ?? {})) {
+      variants[key] = {
+        label: value.label,
+        htmlUrl: `/preview/${value.html}`,
+        pdfUrl: `/preview/${value.pdf}`,
+        pageCount: value.pageCount,
+        sizeKb: value.sizeKb,
+      };
+    }
+
     return {
-      pageCount: Number(stdout.match(/\((\d+) pages?,/)?.[1]) || null,
-      sizeKb: Number(stdout.match(/(\d+) KB/)?.[1]) || null,
+      variants,
+      pageCount: variants.designed?.pageCount ?? null,
+      sizeKb: variants.designed?.sizeKb ?? null,
       durationMs: Date.now() - started,
       log: stdout.trim(),
       warnings: stderr.trim() || null,
@@ -230,6 +252,15 @@ async function handleGetCv(res) {
   sendJson(res, 200, data);
 }
 
+async function handleGetBuild(res) {
+  try {
+    const manifest = JSON.parse(await readFile(paths.manifest, "utf8"));
+    sendJson(res, 200, manifest);
+  } catch {
+    sendJson(res, 200, { variants: {} });
+  }
+}
+
 async function handleSave(req, res) {
   const data = await readJsonBody(req);
   const errors = validateForSave(data);
@@ -329,6 +360,11 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === "GET" && pathname === "/api/build") {
+      await handleGetBuild(res);
+      return;
+    }
+
     if (req.method === "PUT" && pathname === "/api/cv") {
       await handleSave(req, res);
       return;
@@ -365,7 +401,7 @@ const server = createServer(async (req, res) => {
 server.on("error", (error) => {
   if (error.code === "EADDRINUSE") {
     console.error(
-      `Port ${PORT} is already in use. Try: PORT=4174 npm run editor`,
+      `Port ${PORT} is already in use. Try: PORT=8081 npm run editor`,
     );
     process.exit(1);
   }
@@ -373,8 +409,16 @@ server.on("error", (error) => {
 });
 
 async function start() {
-  if (!existsSync(paths.html) || !existsSync(paths.pdf)) {
-    console.log("No build found — generating the initial HTML/PDF…");
+  const required = [
+    paths.html,
+    paths.pdf,
+    paths.atsHtml,
+    paths.atsPdf,
+    paths.manifest,
+  ];
+
+  if (required.some((file) => !existsSync(file))) {
+    console.log("No complete build found — generating the initial HTML/PDFs…");
     try {
       await runBuild();
     } catch (error) {

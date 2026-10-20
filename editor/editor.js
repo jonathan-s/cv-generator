@@ -55,18 +55,12 @@ const ENTRY_SECTIONS = [
   },
 ];
 
-const VARIANT_FILES = {
-  designed: {
-    html: "/preview/wakako-obata.html",
-    pdf: "/preview/wakako-obata.pdf",
-    label: "Designed",
-  },
-  ats: {
-    html: "/preview/wakako-obata-ats.html",
-    pdf: "/preview/wakako-obata-ats.pdf",
-    label: "ATS",
-  },
+const VARIANT_LABELS = {
+  designed: "Designed",
+  ats: "ATS",
 };
+
+const PROFILE_STORAGE_KEY = "cv-editor.profile";
 
 const state = {
   data: null,
@@ -75,7 +69,28 @@ const state = {
   revision: 0,
   variant: "designed",
   variants: null,
+  /** id of the selected data profile (= JSON file name without extension) */
+  profile: null,
+  profiles: [],
 };
+
+/** Preview URLs for the selected profile's build outputs. */
+function variantFiles() {
+  const id = state.profile;
+
+  return {
+    designed: {
+      html: `/preview/${id}.html`,
+      pdf: `/preview/${id}.pdf`,
+      label: VARIANT_LABELS.designed,
+    },
+    ats: {
+      html: `/preview/${id}-ats.html`,
+      pdf: `/preview/${id}-ats.pdf`,
+      label: VARIANT_LABELS.ats,
+    },
+  };
+}
 
 let photoThumb = null;
 
@@ -92,6 +107,10 @@ const dom = {
   variantDesigned: document.getElementById("variant-designed"),
   variantAts: document.getElementById("variant-ats"),
   jumpNav: document.getElementById("jump-nav"),
+  profileSelect: document.getElementById("profile"),
+  brandMark: document.getElementById("brand-mark"),
+  brandName: document.getElementById("brand-name"),
+  dataPath: document.getElementById("data-path"),
 };
 
 /* -------------------------------------------------------------------------- */
@@ -396,7 +415,7 @@ function renderBasics(data) {
                 data.basics.photo = value;
                 updatePhotoPreview();
               },
-              "assets/wakako-obata.jpg",
+              "assets/photo.jpg",
             ),
             "Relative to the project root. Saving copies the photo into dist/.",
           ),
@@ -851,6 +870,7 @@ function updateSaveButton() {
   dom.save.textContent = state.saving ? "Saving…" : "Save & rebuild";
   dom.reload.disabled = state.saving;
   dom.rebuild.disabled = state.saving;
+  dom.profileSelect.disabled = state.saving || state.profiles.length === 0;
 }
 
 function setStatus(message, kind = "") {
@@ -862,13 +882,142 @@ function setStatus(message, kind = "") {
 /* load / save / preview                                                     */
 /* -------------------------------------------------------------------------- */
 
+function profileLabel(profile) {
+  if (!profile) return "";
+  return profile.name && profile.name !== profile.id
+    ? `${profile.name} (${profile.id})`
+    : profile.id;
+}
+
+function initials(name) {
+  return (
+    String(name)
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0].toUpperCase())
+      .join("") || "CV"
+  );
+}
+
+function applyProfileChrome() {
+  const profile = state.profiles.find((item) => item.id === state.profile);
+  const name =
+    state.data?.basics?.name?.trim() ||
+    profile?.name ||
+    state.profile ||
+    "CV editor";
+
+  dom.brandName.textContent = name;
+  dom.brandMark.textContent = initials(name);
+  dom.dataPath.textContent =
+    profile?.file ??
+    (state.profile ? `data/${state.profile}.json` : "data/*.json");
+  document.title = `CV editor – ${name}`;
+}
+
+function renderProfileSelect() {
+  const options = state.profiles.map((profile) =>
+    h("option", { value: profile.id }, profileLabel(profile)),
+  );
+
+  dom.profileSelect.replaceChildren(
+    ...(options.length
+      ? options
+      : [h("option", { value: "" }, "No profiles in data/")]),
+  );
+  dom.profileSelect.value = state.profile ?? "";
+  dom.profileSelect.disabled = state.saving || options.length === 0;
+}
+
+function persistProfile() {
+  if (!state.profile) return;
+
+  try {
+    localStorage.setItem(PROFILE_STORAGE_KEY, state.profile);
+  } catch {
+    /* storage may be unavailable; the URL still carries the selection */
+  }
+
+  const url = new URL(window.location.href);
+  url.searchParams.set("profile", state.profile);
+  window.history.replaceState(null, "", url);
+}
+
+async function loadProfiles() {
+  const response = await fetch("/api/profiles", { cache: "no-store" });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      payload.error || `Could not load the profile list (${response.status}).`,
+    );
+  }
+
+  state.profiles = Array.isArray(payload.profiles) ? payload.profiles : [];
+
+  let stored = null;
+  try {
+    stored =
+      new URLSearchParams(window.location.search).get("profile") ||
+      localStorage.getItem(PROFILE_STORAGE_KEY);
+  } catch {
+    stored = null;
+  }
+
+  const known = state.profiles.some((profile) => profile.id === stored);
+  state.profile = known
+    ? stored
+    : (payload.default ?? state.profiles[0]?.id ?? null);
+
+  renderProfileSelect();
+  persistProfile();
+}
+
+async function switchProfile(id) {
+  if (!id || id === state.profile) {
+    renderProfileSelect();
+    return;
+  }
+
+  if (
+    state.saving ||
+    (state.dirty &&
+      !window.confirm("Switch profile and discard unsaved changes?"))
+  ) {
+    renderProfileSelect();
+    return;
+  }
+
+  state.profile = id;
+  state.data = null;
+  state.dirty = false;
+  state.revision = 0;
+  state.variants = null;
+
+  persistProfile();
+  renderProfileSelect();
+  await load();
+}
+
 async function load() {
+  if (!state.profile) {
+    state.data = null;
+    dom.form.replaceChildren(
+      h("p", { class: "loading" }, "No data profiles found in data/."),
+    );
+    applyProfileChrome();
+    setStatus("No data profile found. Add a JSON file to data/.", "error");
+    return;
+  }
+
   setStatus("Loading…", "busy");
 
   try {
+    const query = `?profile=${encodeURIComponent(state.profile)}`;
     const [cvResponse, buildResponse] = await Promise.all([
-      fetch("/api/cv", { cache: "no-store" }),
-      fetch("/api/build", { cache: "no-store" }),
+      fetch(`/api/cv${query}`, { cache: "no-store" }),
+      fetch(`/api/build${query}`, { cache: "no-store" }),
     ]);
     const payload = await cvResponse.json().catch(() => ({}));
     const build = await buildResponse.json().catch(() => ({ variants: {} }));
@@ -885,10 +1034,12 @@ async function load() {
     state.revision = 0;
     render();
     setVariant(state.variant);
-    setStatus("Loaded", "ok");
+    applyProfileChrome();
+    setStatus(`Loaded data/${state.profile}.json`, "ok");
   } catch (error) {
     state.data = null;
     dom.form.replaceChildren(h("p", { class: "loading" }, error.message));
+    applyProfileChrome();
     setStatus(error.message, "error");
   }
 }
@@ -902,7 +1053,7 @@ async function save() {
   setStatus("Saving JSON and rebuilding PDF…", "busy");
 
   try {
-    const response = await fetch("/api/cv", {
+    const response = await fetch(`/api/cv?profile=${encodeURIComponent(state.profile)}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(state.data),
@@ -920,7 +1071,7 @@ async function save() {
     }
 
     state.variants = payload.variants ?? state.variants;
-    dom.pdfLink.href = `${VARIANT_FILES[state.variant].pdf}?v=${Date.now()}`;
+    dom.pdfLink.href = `${variantFiles()[state.variant].pdf}?v=${Date.now()}`;
     refreshPreview();
     updatePreviewMeta(payload);
     updatePhotoPreview();
@@ -986,7 +1137,10 @@ async function rebuild() {
   setStatus("Rebuilding from saved JSON…", "busy");
 
   try {
-    const response = await fetch("/api/rebuild", { method: "POST" });
+    const response = await fetch(
+      `/api/rebuild?profile=${encodeURIComponent(state.profile)}`,
+      { method: "POST" },
+    );
     const payload = await response.json().catch(() => ({}));
 
     if (!response.ok) {
@@ -1000,7 +1154,7 @@ async function rebuild() {
     }
 
     state.variants = payload.variants ?? state.variants;
-    dom.pdfLink.href = `${VARIANT_FILES[state.variant].pdf}?v=${Date.now()}`;
+    dom.pdfLink.href = `${variantFiles()[state.variant].pdf}?v=${Date.now()}`;
     refreshPreview();
     updatePreviewMeta(payload);
     updatePhotoPreview();
@@ -1038,11 +1192,15 @@ async function reload() {
 }
 
 function refreshPreview() {
-  dom.preview.src = `${VARIANT_FILES[state.variant].html}?v=${Date.now()}`;
+  const files = variantFiles();
+  if (!files[state.variant]) return;
+
+  dom.preview.src = `${files[state.variant].html}?v=${Date.now()}`;
 }
 
 function setVariant(variant) {
-  if (!VARIANT_FILES[variant]) return;
+  const files = variantFiles();
+  if (!files[variant]) return;
 
   state.variant = variant;
   const isDesigned = variant === "designed";
@@ -1051,7 +1209,7 @@ function setVariant(variant) {
   dom.variantAts.classList.toggle("is-active", !isDesigned);
   dom.variantDesigned.setAttribute("aria-pressed", String(isDesigned));
   dom.variantAts.setAttribute("aria-pressed", String(!isDesigned));
-  dom.pdfLink.href = `${VARIANT_FILES[variant].pdf}?v=${Date.now()}`;
+  dom.pdfLink.href = `${files[variant].pdf}?v=${Date.now()}`;
 
   updatePreviewMeta();
   refreshPreview();
@@ -1083,6 +1241,9 @@ function init() {
   dom.refresh.addEventListener("click", () => refreshPreview());
   dom.variantDesigned.addEventListener("click", () => setVariant("designed"));
   dom.variantAts.addEventListener("click", () => setVariant("ats"));
+  dom.profileSelect.addEventListener("change", () =>
+    switchProfile(dom.profileSelect.value),
+  );
 
   dom.form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -1101,7 +1262,13 @@ function init() {
     }
   });
 
-  load();
+  loadProfiles()
+    .then(load)
+    .catch((error) => {
+      setStatus(error.message, "error");
+      dom.form.replaceChildren(h("p", { class: "loading" }, error.message));
+      dom.profileSelect.disabled = true;
+    });
 }
 
 init();

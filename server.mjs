@@ -4,11 +4,12 @@
  *
  *   npm run editor   ->  http://127.0.0.1:8080
  *
- * The editor is a plain HTML/CSS/JS page. Saving sends the whole JSON document
- * to PUT /api/cv, which:
+ * Every JSON file in data/ is a selectable data profile. The editor is a plain
+ * HTML/CSS/JS page. Saving sends the whole JSON document to
+ * PUT /api/cv?profile=<id>, which:
  *   1. validates the document,
- *   2. writes it atomically to data/wakako-obata.json,
- *   3. runs scripts/build.mjs (HTML + PDF),
+ *   2. writes it atomically to data/<id>.json,
+ *   3. runs scripts/build.mjs --profile <id> (HTML + PDF),
  *   4. returns the build result so the preview can refresh.
  */
 
@@ -20,20 +21,21 @@ import { promisify } from "node:util";
 import { dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateCv } from "./scripts/lib/validate.mjs";
+import {
+  assertProfileId,
+  listProfiles,
+  profileOutputs,
+  profilePaths,
+  readManifest,
+} from "./scripts/lib/profiles.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = dirname(fileURLToPath(import.meta.url));
 
 const paths = {
-  data: join(root, "data", "wakako-obata.json"),
   build: join(root, "scripts", "build.mjs"),
   editor: join(root, "editor"),
   dist: join(root, "dist"),
-  html: join(root, "dist", "wakako-obata.html"),
-  pdf: join(root, "dist", "wakako-obata.pdf"),
-  atsHtml: join(root, "dist", "wakako-obata-ats.html"),
-  atsPdf: join(root, "dist", "wakako-obata-ats.pdf"),
-  manifest: join(root, "dist", "build.json"),
 };
 
 const HOST = process.env.HOST || "127.0.0.1";
@@ -100,6 +102,68 @@ async function sendFile(res, filePath) {
 }
 
 /* -------------------------------------------------------------------------- */
+/* profiles                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Resolves the `?profile=<id>` query parameter. Without one, the first profile
+ * in data/ (alphabetical) is used.
+ */
+async function resolveProfile(url) {
+  const profiles = await listProfiles(root);
+
+  if (!profiles.length) {
+    throw new HttpError(404, "No data profiles found. Add a JSON file to data/.");
+  }
+
+  const requested = url.searchParams.get("profile");
+  if (!requested) return profilePaths(root, profiles[0].id);
+
+  try {
+    assertProfileId(requested);
+  } catch (error) {
+    throw new HttpError(400, error.message);
+  }
+
+  if (!profiles.some((profile) => profile.id === requested)) {
+    throw new HttpError(404, `Unknown profile: ${requested}.`);
+  }
+
+  return profilePaths(root, requested);
+}
+
+function variantPayload(variants) {
+  const payload = {};
+
+  for (const [key, variant] of Object.entries(variants ?? {})) {
+    payload[key] = {
+      label: variant.label,
+      htmlUrl: variant.html ? `/preview/${variant.html}` : null,
+      pdfUrl: variant.pdf ? `/preview/${variant.pdf}` : null,
+      pageCount: variant.pageCount ?? null,
+      sizeKb: variant.sizeKb ?? null,
+    };
+  }
+
+  return payload;
+}
+
+async function buildPayload(profileId) {
+  const manifest = await readManifest(root);
+  const entry = manifest.profiles[profileId] ?? null;
+  const variants = variantPayload(entry?.variants);
+
+  return {
+    profile: profileId,
+    label: entry?.label ?? profileId,
+    builtAt: entry?.builtAt ?? manifest.builtAt ?? null,
+    variants,
+    pageCount: variants.designed?.pageCount ?? null,
+    sizeKb: variants.designed?.sizeKb ?? null,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
 /* build                                                                      */
 /* -------------------------------------------------------------------------- */
 
@@ -111,42 +175,19 @@ function enqueue(operation) {
   return result;
 }
 
-async function runBuild() {
+async function runBuild(profileId = null) {
   const started = Date.now();
+  const args = [paths.build];
+  if (profileId) args.push("--profile", profileId);
 
   try {
-    const { stdout, stderr } = await execFileAsync(
-      process.execPath,
-      [paths.build],
-      {
-        cwd: root,
-        timeout: 180_000,
-        maxBuffer: 10 * 1024 * 1024,
-      },
-    );
-
-    let manifest = { variants: {} };
-    try {
-      manifest = JSON.parse(await readFile(paths.manifest, "utf8"));
-    } catch {
-      /* the build should write this, but do not fail the save over it */
-    }
-
-    const variants = {};
-    for (const [key, value] of Object.entries(manifest.variants ?? {})) {
-      variants[key] = {
-        label: value.label,
-        htmlUrl: `/preview/${value.html}`,
-        pdfUrl: `/preview/${value.pdf}`,
-        pageCount: value.pageCount,
-        sizeKb: value.sizeKb,
-      };
-    }
+    const { stdout, stderr } = await execFileAsync(process.execPath, args, {
+      cwd: root,
+      timeout: 180_000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
 
     return {
-      variants,
-      pageCount: variants.designed?.pageCount ?? null,
-      sizeKb: variants.designed?.sizeKb ?? null,
       durationMs: Date.now() - started,
       log: stdout.trim(),
       warnings: stderr.trim() || null,
@@ -230,43 +271,68 @@ function validateForSave(data) {
   return errors;
 }
 
-async function writeData(data) {
+async function writeData(profile, data) {
   const json = `${JSON.stringify(data, null, 2)}\n`;
-  const temporary = `${paths.data}.tmp`;
+  const temporary = `${profile.dataFile}.tmp`;
   await writeFile(temporary, json, "utf8");
-  await rename(temporary, paths.data);
+  await rename(temporary, profile.dataFile);
 }
 
 /* -------------------------------------------------------------------------- */
 /* API handlers                                                               */
 /* -------------------------------------------------------------------------- */
 
-async function handleGetCv(res) {
-  const text = await readFile(paths.data, "utf8");
+async function handleGetProfiles(res) {
+  const [profiles, manifest] = await Promise.all([
+    listProfiles(root),
+    readManifest(root),
+  ]);
+
+  const payload = profiles.map((profile) => ({
+    id: profile.id,
+    file: profile.file,
+    name: profile.name || profile.id,
+    title: profile.title || "",
+    updated: profile.updated || "",
+    valid: profile.valid,
+    built: Boolean(manifest.profiles[profile.id]),
+  }));
+
+  sendJson(res, 200, {
+    profiles: payload,
+    default: payload[0]?.id ?? null,
+  });
+}
+
+async function handleGetCv(res, profile) {
+  const text = await readFile(profile.dataFile, "utf8");
   let data;
   try {
     data = JSON.parse(text);
   } catch {
-    throw new HttpError(500, "data/wakako-obata.json is not valid JSON.");
+    throw new HttpError(
+      500,
+      `data/${profile.id}.json is not valid JSON.`,
+    );
   }
   sendJson(res, 200, data);
 }
 
-async function handleGetBuild(res) {
-  try {
-    const manifest = JSON.parse(await readFile(paths.manifest, "utf8"));
-    sendJson(res, 200, manifest);
-  } catch {
-    sendJson(res, 200, { variants: {} });
-  }
+async function handleGetBuild(res, profile) {
+  sendJson(res, 200, { ok: true, ...(await buildPayload(profile.id)) });
 }
 
-async function handleSave(req, res) {
+async function handleSave(req, res, profile) {
   const data = await readJsonBody(req);
   const errors = validateForSave(data);
 
   if (errors.length) {
-    sendJson(res, 422, { ok: false, saved: false, errors });
+    sendJson(res, 422, {
+      ok: false,
+      saved: false,
+      profile: profile.id,
+      errors,
+    });
     return;
   }
 
@@ -274,35 +340,52 @@ async function handleSave(req, res) {
 
   try {
     const result = await enqueue(async () => {
-      await writeData(data);
+      await writeData(profile, data);
       saved = true;
-      console.log(`Saved ${paths.data.replace(`${root}/`, "")}`);
-      return runBuild();
+      console.log(`Saved data/${profile.id}.json`);
+      return runBuild(profile.id);
     });
 
-    console.log(`Rebuilt in ${result.durationMs} ms`);
-    sendJson(res, 200, { ok: true, saved: true, ...result });
+    console.log(`Rebuilt ${profile.id} in ${result.durationMs} ms`);
+    const build = await buildPayload(profile.id);
+    sendJson(res, 200, {
+      ok: true,
+      saved: true,
+      ...build,
+      durationMs: result.durationMs,
+      log: result.log,
+      warnings: result.warnings,
+    });
   } catch (error) {
     console.error(error.message);
     if (error.details) console.error(error.details);
     sendJson(res, error.status || 500, {
       ok: false,
       saved,
+      profile: profile.id,
       error: error.message,
       details: error.details || null,
     });
   }
 }
 
-async function handleRebuild(res) {
+async function handleRebuild(res, profile) {
   try {
-    const result = await enqueue(runBuild);
-    sendJson(res, 200, { ok: true, ...result });
+    const result = await enqueue(() => runBuild(profile.id));
+    const build = await buildPayload(profile.id);
+    sendJson(res, 200, {
+      ok: true,
+      ...build,
+      durationMs: result.durationMs,
+      log: result.log,
+      warnings: result.warnings,
+    });
   } catch (error) {
     console.error(error.message);
     if (error.details) console.error(error.details);
     sendJson(res, error.status || 500, {
       ok: false,
+      profile: profile.id,
       error: error.message,
       details: error.details || null,
     });
@@ -313,13 +396,21 @@ async function handleRebuild(res) {
 /* static handlers                                                            */
 /* -------------------------------------------------------------------------- */
 
+async function defaultPreviewFile() {
+  const profiles = await listProfiles(root);
+  if (!profiles.length) {
+    throw new HttpError(404, "No data profiles found. Add a JSON file to data/.");
+  }
+  return `${profiles[0].id}.html`;
+}
+
 async function handlePreview(res, pathname) {
-  const relative =
+  const relativePath =
     pathname === "/preview" || pathname === "/preview/"
-      ? "wakako-obata.html"
+      ? await defaultPreviewFile()
       : pathname.slice("/preview/".length);
 
-  const file = resolve(paths.dist, relative);
+  const file = resolve(paths.dist, relativePath);
   if (!file.startsWith(paths.dist + sep)) {
     throw new HttpError(403, "Forbidden.");
   }
@@ -355,23 +446,28 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === "GET" && pathname === "/api/profiles") {
+      await handleGetProfiles(res);
+      return;
+    }
+
     if (req.method === "GET" && pathname === "/api/cv") {
-      await handleGetCv(res);
+      await handleGetCv(res, await resolveProfile(url));
       return;
     }
 
     if (req.method === "GET" && pathname === "/api/build") {
-      await handleGetBuild(res);
+      await handleGetBuild(res, await resolveProfile(url));
       return;
     }
 
     if (req.method === "PUT" && pathname === "/api/cv") {
-      await handleSave(req, res);
+      await handleSave(req, res, await resolveProfile(url));
       return;
     }
 
     if (req.method === "POST" && pathname === "/api/rebuild") {
-      await handleRebuild(res);
+      await handleRebuild(res, await resolveProfile(url));
       return;
     }
 
@@ -409,30 +505,36 @@ server.on("error", (error) => {
 });
 
 async function start() {
-  const required = [
-    paths.html,
-    paths.pdf,
-    paths.atsHtml,
-    paths.atsPdf,
-    paths.manifest,
-  ];
+  const [profiles, manifest] = await Promise.all([
+    listProfiles(root),
+    readManifest(root),
+  ]);
 
-  if (required.some((file) => !existsSync(file))) {
-    console.log("No complete build found — generating the initial HTML/PDFs…");
-    try {
-      await runBuild();
-    } catch (error) {
-      console.error(error.message);
-      if (error.details) console.error(error.details);
+  if (!profiles.length) {
+    console.log("No data profiles found. Add a JSON file to data/.");
+  } else {
+    const needsBuild = profiles.some(
+      (profile) =>
+        !manifest.profiles[profile.id] ||
+        profileOutputs(profilePaths(root, profile.id)).some(
+          (file) => !existsSync(file),
+        ),
+    );
+
+    if (needsBuild) {
+      console.log("No complete build found — generating the HTML/PDFs…");
+      try {
+        await runBuild();
+      } catch (error) {
+        console.error(error.message);
+        if (error.details) console.error(error.details);
+      }
     }
   }
 
   server.listen(PORT, HOST, () => {
     const displayHost = HOST === "0.0.0.0" ? "localhost" : HOST;
     console.log(`CV editor: http://${displayHost}:${PORT}`);
-    console.log(
-      `PDF:       http://${displayHost}:${PORT}/preview/wakako-obata.pdf`,
-    );
   });
 }
 

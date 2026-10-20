@@ -4,18 +4,25 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <title>CV editor – Wakako Obata</title>
+  <title>CV editor</title>
   <link rel="stylesheet" href="/editor.css">
   <script src="/editor.js" defer></script>
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
-      <span class="brand__mark" aria-hidden="true">WO</span>
+      <span id="brand-mark" class="brand__mark" aria-hidden="true">CV</span>
       <span class="brand__text">
-        <strong>Wakako Obata</strong>
+        <strong id="brand-name">CV editor</strong>
         <span>CV editor</span>
       </span>
+    </div>
+
+    <div class="profile-picker">
+      <label class="profile-picker__label" for="profile">Profile</label>
+      <select id="profile" class="select" aria-label="Data profile" disabled>
+        <option>Loading…</option>
+      </select>
     </div>
 
     <div class="topbar__actions">
@@ -31,7 +38,8 @@
         <h1>Content</h1>
         <p>
           Edit the fields below. Saving writes
-          <code>data/wakako-obata.json</code> and regenerates the HTML and PDF.
+          <code id="data-path">data/*.json</code> and regenerates the HTML and PDF
+          for the selected profile.
         </p>
       </div>
 
@@ -56,11 +64,11 @@
         <div class="preview-bar__actions">
           <button id="rebuild" class="btn btn--ghost" type="button" title="Rebuild from the saved JSON">Rebuild</button>
           <button id="refresh" class="btn btn--ghost" type="button">Refresh</button>
-          <a id="pdf-link" class="btn btn--ghost" href="/preview/wakako-obata.pdf" target="_blank" rel="noreferrer">Open PDF ↗</a>
+          <a id="pdf-link" class="btn btn--ghost" href="#" target="_blank" rel="noreferrer">Open PDF ↗</a>
         </div>
       </div>
 
-      <iframe id="preview" class="preview-frame" title="CV preview" src="/preview/wakako-obata.html"></iframe>
+      <iframe id="preview" class="preview-frame" title="CV preview" src="/preview"></iframe>
     </section>
   </main>
 </body>

@@ -1,6 +1,8 @@
 # Wakako Obata – CV
 
-A small pipeline with no npm dependencies that turns one JSON file into two A4 CV variants: a designed two-page CV and a plain single-column ATS version. Both are generated from the same data.
+A small pipeline with no npm dependencies that turns a JSON data profile into two A4 CV variants: a designed two-page CV and a plain single-column ATS version. Both are generated from the same data.
+
+Each JSON file in `data/` is one profile. Its file name (without `.json`) is the profile id, and it names the build outputs: `data/<id>.json` → `dist/<id>.html`, `dist/<id>.pdf`, `dist/<id>-ats.html`, `dist/<id>-ats.pdf`. The editor lets you switch between profiles with a dropdown at the top.
 
 The designed layout follows the **Madelin Parker two-page A4** reference: a circular photo, large name, tagline, contact rows, thin section rules, bold uppercase section headings, single-column body copy, compact multi-column lists for skills, and a repeated name on page 2. The ATS variant deliberately drops the photo, columns, decorative dots and hobbies, using plain text and standard German headings instead.
 
@@ -12,17 +14,20 @@ Start the local editor:
 npm run editor
 ```
 
-Open **http://127.0.0.1:8080**. The page loads `data/wakako-obata.json` into fields. **Save & rebuild** writes the JSON atomically, regenerates both HTMLs and both PDFs, and refreshes the preview. Use the **Designed / ATS** toggle in the preview bar; **Open PDF** follows the selected variant.
+Open **http://127.0.0.1:8080**. The **Profile** dropdown in the top bar lists every JSON file in `data/`; the selection is kept in the URL (`?profile=<id>`) and in local storage, so a reload returns to the same profile. The page loads the selected profile into fields. **Save & rebuild** writes that JSON atomically, regenerates its HTML and PDF, and refreshes the preview. Use the **Designed / ATS** toggle in the preview bar; **Open PDF** follows the selected variant.
+
+Switching profiles with unsaved changes asks for confirmation, and saving only ever touches the selected `data/<id>.json` and its outputs — other profiles' JSON and builds are left alone.
 
 The server binds to `127.0.0.1` by default. Use `PORT=8081 npm run editor` to pick another port. It has no npm dependencies and uses the same validation module as the build (`scripts/lib/validate.mjs`), so invalid data is rejected before the JSON file is touched.
 
-Useful endpoints:
+Useful endpoints (`profile` defaults to the first file in `data/` when omitted):
 
 ```text
-GET  /api/cv       current JSON
-GET  /api/build    current build manifest (page counts/sizes)
-PUT  /api/cv       validate + write JSON + rebuild both variants
-POST /api/rebuild  rebuild both variants without writing JSON
+GET  /api/profiles             list profiles in data/ (+ which are built)
+GET  /api/cv?profile=<id>      current JSON for a profile
+GET  /api/build?profile=<id>   current build manifest for a profile
+PUT  /api/cv?profile=<id>      validate + write JSON + rebuild that profile
+POST /api/rebuild?profile=<id> rebuild a profile without writing JSON
 ```
 
 ## Build
@@ -33,7 +38,15 @@ Requirements: Node 18+, Google Chrome/Chromium for the PDF, and optionally Ghost
 npm run build
 ```
 
-Outputs:
+By default every `data/*.json` profile is built. Build one profile, or skip the PDFs:
+
+```bash
+node scripts/build.mjs --profile wakako-obata
+npm run build:html
+npm run build:html -- --profile wakako-obata
+```
+
+Outputs (one set per profile):
 
 ```
 dist/
@@ -41,20 +54,14 @@ dist/
 ├── wakako-obata.pdf        # designed, exactly 2 A4 pages
 ├── wakako-obata-ats.html   # ATS HTML
 ├── wakako-obata-ats.pdf    # ATS, 2 A4 pages
-├── cv.css                  # designed styles
-├── cv-ats.css              # ATS styles
-├── build.json              # manifest with page counts and sizes
+├── cv.css                  # designed styles (shared)
+├── cv-ats.css              # ATS styles (shared)
+├── build.json              # manifest per profile: page counts and sizes
 └── assets/
     └── wakako-obata.jpg
 ```
 
-`dist/` is generated and git-ignored. Remove the `dist/` line from `.gitignore` if you want to commit the built PDF.
-
-Skip the PDFs and only build both HTML files:
-
-```bash
-npm run build:html
-```
+`dist/` is generated and git-ignored. Remove the `dist/` line from `.gitignore` if you want to commit the built PDFs. A profile build only rewrites that profile's files, so building one profile never wipes another profile's output. Removing a `data/*.json` file prunes its stale HTML/PDF on the next full build.
 
 The PDFs are printed with headless Chrome. If Chrome is not in the default macOS location, point the build at it:
 
@@ -65,12 +72,13 @@ CHROME_PATH="/path/to/chrome" npm run build
 ## Project structure
 
 ```
-data/wakako-obata.json      # the CV content (single source of truth)
+data/<profile>.json         # the CV content, one file per profile (source of truth)
 templates/cv.html           # designed HTML skeleton with {{tokens}}
 templates/cv-ats.html       # ATS HTML skeleton with {{tokens}}
 styles/cv.css               # designed layout, typography and print rules
 styles/cv-ats.css           # ATS layout and print rules
-scripts/build.mjs           # JSON → two HTMLs → two PDFs
+scripts/build.mjs           # JSON profiles → HTMLs → PDFs
+scripts/lib/profiles.mjs    # profile discovery, output paths, build manifest
 scripts/lib/validate.mjs    # shared data validation
 scripts/extract_docx.py     # helper: raw text extraction from the source DOCX
 server.mjs                  # local editor server
@@ -81,7 +89,7 @@ documents/                  # original DOCX/PDF (git-ignored)
 
 ## Editing the CV
 
-- **Content** – use `npm run editor` for the form editor, or edit `data/wakako-obata.json` directly and run `npm run build`. Saving in the editor writes the JSON and rebuilds automatically.
+- **Content** – use `npm run editor` for the form editor, or edit a `data/<profile>.json` directly and run `npm run build`. Saving in the editor writes that JSON and rebuilds it automatically. To add a profile, copy an existing JSON file in `data/` under a new name and adjust it (the file name is the profile id and the output prefix).
 - **Look and feel** – edit `styles/cv.css` (designed) or `styles/cv-ats.css` (ATS). Screen preview and print share the same stylesheets; print rules are at the bottom of each file. Use the **Rebuild** button in the preview bar (or `POST /api/rebuild`) to pick up CSS changes without saving form changes.
 - **Markup** – edit `templates/cv.html` or `templates/cv-ats.html`. The `{{...}}` tokens are filled by `scripts/build.mjs`.
 

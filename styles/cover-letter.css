@@ -18,13 +18,16 @@
   flex-direction: column;
 }
 
-/* ~88 characters per line; 10pt keeps that inside the 182 mm text column */
+/*
+ * Full text column at 12pt (the clear-print minimum): ~85 characters per line
+ * at the CV's 182mm measure. A fixed ch/em cap would leave a wide empty right
+ * margin and break the alignment with the header rule, so none is used.
+ */
 .letter__body {
-  max-width: 88ch;
   margin-top: 8mm;
   color: var(--text);
-  font-size: 10pt;
-  line-height: 1.55;
+  font-size: 12pt;
+  line-height: 1.5;
   hyphens: manual;
   -webkit-hyphens: manual;
 }
@@ -55,17 +58,17 @@
 }
 
 .letter__body h2 {
-  font-size: 11.5pt;
+  font-size: 14pt;
 }
 
 .letter__body h3 {
-  font-size: 10.5pt;
+  font-size: 13pt;
 }
 
 .letter__body h4,
 .letter__body h5,
 .letter__body h6 {
-  font-size: 10pt;
+  font-size: 12pt;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -119,7 +122,7 @@
   overflow: hidden;
   background: rgba(23, 23, 23, 0.04);
   font-family: var(--mono);
-  font-size: 8.6pt;
+  font-size: 9.5pt;
   line-height: 1.45;
   white-space: pre-wrap;
 }

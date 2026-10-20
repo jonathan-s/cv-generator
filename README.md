@@ -86,7 +86,7 @@ templates/cv-ats.html       # ATS HTML skeleton with {{tokens}}
 templates/cover-letter.html # cover letter skeleton (header + rendered Markdown)
 styles/cv.css               # designed layout, typography and print rules
 styles/cv-ats.css           # ATS layout and print rules
-styles/cover-letter.css     # letter body: 10pt, 88ch measure, Markdown elements
+styles/cover-letter.css     # letter body: 12pt, full-width measure, Markdown elements
 scripts/build.mjs           # JSON profiles → HTMLs → PDFs
 scripts/lib/profiles.mjs    # profile discovery, output paths, build manifest
 scripts/lib/validate.mjs    # shared data validation
@@ -133,7 +133,7 @@ The designed variant, `templates/cv.html`, contains two explicit `.page` article
 
 The ATS variant, `templates/cv-ats.html`, is a single flowing column. Chrome paginates it naturally; it currently fits two pages. The build warns if either variant is not exactly two pages.
 
-The cover letter, `templates/cover-letter.html`, is a single explicit `.page` built from the same `cv.css` page rules, so it prints as exactly one A4 page; the build expects one page and warns otherwise. Its body is capped at `88ch` with 10 pt type for a comfortable line length, so a normal letter stays well inside the page.
+The cover letter, `templates/cover-letter.html`, is a single explicit `.page` built from the same `cv.css` page rules, so it prints as exactly one A4 page; the build expects one page and warns otherwise. Its body uses the full 182 mm text column at 12 pt (the clear-print minimum), which works out to roughly 85 characters per line, and it shares the header's left and right edges. A narrower `ch`/`em` cap was rejected: it left a wide empty right margin that no longer lined up with the header rule.
 
 Page 1 holds the profile and full work history. Page 2 holds education, volunteer work, skills, and the extras block: languages, EDV and — designed variant only — hobbies.
 

@@ -688,6 +688,22 @@ textarea.input {
   box-shadow: 0 4px 24px rgba(30, 22, 16, 0.16);
 }
 
+/* ---- cover letter editor ------------------------------------------------- */
+
+#section-coverLetter textarea.input {
+  min-height: 440px;
+  padding: 12px 14px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+  tab-size: 2;
+}
+
+.btn.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 /* ---- loading / empty ----------------------------------------------------- */
 
 .loading {

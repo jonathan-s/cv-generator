@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Anschreiben von {{name}}">
+  <meta name="author" content="{{name}}">
+  <title>Anschreiben – {{name}}</title>
+  <link rel="stylesheet" href="./cv.css">
+  <link rel="stylesheet" href="./cover-letter.css">
+</head>
+<body>
+  <main class="document">
+
+    <article class="page page--first letter" aria-label="Anschreiben">
+      <!-- same identity header as the CV, without the photo -->
+      <header class="identity identity--letter">
+        <div class="identity__body">
+          <h1 class="identity__name">{{name}}</h1>
+          <p class="identity__tagline">{{tagline}}</p>
+          <div class="contact">{{contact}}</div>
+        </div>
+      </header>
+
+      <div class="letter__body">
+{{letter}}
+      </div>
+    </article>
+
+  </main>
+</body>
+</html>

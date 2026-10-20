@@ -58,12 +58,14 @@ const ENTRY_SECTIONS = [
 const VARIANT_LABELS = {
   designed: "Designed",
   ats: "ATS",
+  coverLetter: "Cover letter",
 };
 
 const PROFILE_STORAGE_KEY = "cv-editor.profile";
 
 const state = {
   data: null,
+  coverLetter: "",
   dirty: false,
   saving: false,
   revision: 0,
@@ -89,6 +91,11 @@ function variantFiles() {
       pdf: `/preview/${id}-ats.pdf`,
       label: VARIANT_LABELS.ats,
     },
+    coverLetter: {
+      html: `/preview/${id}-cover-letter.html`,
+      pdf: `/preview/${id}-cover-letter.pdf`,
+      label: VARIANT_LABELS.coverLetter,
+    },
   };
 }
 
@@ -106,6 +113,7 @@ const dom = {
   pdfLink: document.getElementById("pdf-link"),
   variantDesigned: document.getElementById("variant-designed"),
   variantAts: document.getElementById("variant-ats"),
+  variantCover: document.getElementById("variant-cover"),
   jumpNav: document.getElementById("jump-nav"),
   profileSelect: document.getElementById("profile"),
   brandMark: document.getElementById("brand-mark"),
@@ -332,6 +340,7 @@ function render() {
   dom.form.replaceChildren(
     renderMeta(data),
     renderBasics(data),
+    renderCoverLetter(),
     renderLabels(data),
     renderSummary(data),
     ...ENTRY_SECTIONS.map((section) => renderEntrySection(section, data)),
@@ -474,6 +483,28 @@ function updatePhotoPreview() {
   }
 
   photoThumb.src = `/preview/${encodeURI(path)}?v=${Date.now()}`;
+}
+
+function renderCoverLetter() {
+  return card(
+    "coverLetter",
+    "Cover letter",
+    "Saved as Markdown next to the CV data and rendered as its own A4 page. It reuses the CV header, without the photo.",
+    [
+      field(
+        `Markdown — data/${state.profile}.cover-letter.md`,
+        textArea(
+          state.coverLetter,
+          (value) => {
+            state.coverLetter = value;
+          },
+          26,
+          "Sehr geehrte Damen und Herren,\n\n…",
+        ),
+        "Paragraphs, **bold**, *italic*, `code`, [links](https://…), - lists, ## headings, > quotes. An empty letter removes the file and its PDF.",
+      ),
+    ],
+  );
 }
 
 function renderLabels(data) {
@@ -1015,12 +1046,14 @@ async function load() {
 
   try {
     const query = `?profile=${encodeURIComponent(state.profile)}`;
-    const [cvResponse, buildResponse] = await Promise.all([
+    const [cvResponse, buildResponse, letterResponse] = await Promise.all([
       fetch(`/api/cv${query}`, { cache: "no-store" }),
       fetch(`/api/build${query}`, { cache: "no-store" }),
+      fetch(`/api/cover-letter${query}`, { cache: "no-store" }),
     ]);
     const payload = await cvResponse.json().catch(() => ({}));
     const build = await buildResponse.json().catch(() => ({ variants: {} }));
+    const letter = await letterResponse.json().catch(() => ({}));
 
     if (!cvResponse.ok) {
       throw new Error(
@@ -1029,6 +1062,8 @@ async function load() {
     }
 
     state.data = normalizeData(payload);
+    state.coverLetter =
+      typeof letter.markdown === "string" ? letter.markdown : "";
     state.variants = build.variants ?? {};
     state.dirty = false;
     state.revision = 0;
@@ -1050,14 +1085,20 @@ async function save() {
   const revisionAtSave = state.revision;
   state.saving = true;
   updateSaveButton();
-  setStatus("Saving JSON and rebuilding PDF…", "busy");
+  setStatus("Saving JSON and Markdown, rebuilding PDFs…", "busy");
 
   try {
-    const response = await fetch(`/api/cv?profile=${encodeURIComponent(state.profile)}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(state.data),
-    });
+    const response = await fetch(
+      `/api/document?profile=${encodeURIComponent(state.profile)}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cv: state.data,
+          coverLetter: state.coverLetter,
+        }),
+      },
+    );
 
     const payload = await response.json().catch(() => ({}));
 
@@ -1071,17 +1112,19 @@ async function save() {
     }
 
     state.variants = payload.variants ?? state.variants;
-    dom.pdfLink.href = `${variantFiles()[state.variant].pdf}?v=${Date.now()}`;
+    const newerEdits = state.revision !== revisionAtSave;
+    state.dirty = newerEdits;
+    updatePdfLink();
     refreshPreview();
     updatePreviewMeta(payload);
     updatePhotoPreview();
 
-    const newerEdits = state.revision !== revisionAtSave;
-    state.dirty = newerEdits;
     const summary = Object.values(payload.variants ?? {})
       .map(
         (variant) =>
-          `${variant.label ?? "Variant"}: ${variant.pageCount ?? "?"} pages`,
+          `${variant.label ?? "Variant"}: ${variant.pageCount ?? "?"} ${
+            variant.pageCount === 1 ? "page" : "pages"
+          }`,
       )
       .join(" · ");
 
@@ -1154,7 +1197,7 @@ async function rebuild() {
     }
 
     state.variants = payload.variants ?? state.variants;
-    dom.pdfLink.href = `${variantFiles()[state.variant].pdf}?v=${Date.now()}`;
+    updatePdfLink();
     refreshPreview();
     updatePreviewMeta(payload);
     updatePhotoPreview();
@@ -1162,7 +1205,9 @@ async function rebuild() {
     const summary = Object.values(payload.variants ?? {})
       .map(
         (variant) =>
-          `${variant.label ?? "Variant"}: ${variant.pageCount ?? "?"} pages`,
+          `${variant.label ?? "Variant"}: ${variant.pageCount ?? "?"} ${
+            variant.pageCount === 1 ? "page" : "pages"
+          }`,
       )
       .join(" · ");
     const suffix = state.dirty
@@ -1193,9 +1238,75 @@ async function reload() {
 
 function refreshPreview() {
   const files = variantFiles();
-  if (!files[state.variant]) return;
+  const file = files[state.variant];
+  if (!file) return;
 
-  dom.preview.src = `${files[state.variant].html}?v=${Date.now()}`;
+  if (!state.variants?.[state.variant]) {
+    showEmptyPreview();
+    return;
+  }
+
+  dom.preview.removeAttribute("srcdoc");
+  dom.preview.src = `${file.html}?v=${Date.now()}`;
+}
+
+function showEmptyPreview() {
+  const isLetter = state.variant === "coverLetter";
+  const message = isLetter
+    ? state.coverLetter.trim()
+      ? "The cover letter has not been generated yet. Save to build the preview."
+      : "No cover letter yet. Write one in the editor and save."
+    : "This variant has not been built yet. Save or rebuild to generate it.";
+
+  dom.preview.removeAttribute("src");
+  dom.preview.srcdoc = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { height: 100%; }
+  body {
+    display: grid;
+    place-items: center;
+    margin: 0;
+    background: #fff;
+    color: #6f6963;
+    font: 14px/1.5 "Helvetica Neue", Helvetica, Arial, sans-serif;
+    text-align: center;
+  }
+  p { max-width: 36ch; margin: 0; }
+</style>
+</head>
+<body><p>${message}</p></body>
+</html>`;
+}
+
+function updatePdfLink() {
+  const files = variantFiles()[state.variant];
+  const built = Boolean(files && state.variants?.[state.variant]);
+
+  if (!built) {
+    dom.pdfLink.href = "#";
+    dom.pdfLink.classList.add("is-disabled");
+    dom.pdfLink.setAttribute("aria-disabled", "true");
+    dom.pdfLink.setAttribute("tabindex", "-1");
+    dom.pdfLink.title = "Not generated yet — save or rebuild first.";
+    return;
+  }
+
+  dom.pdfLink.href = `${files.pdf}?v=${Date.now()}`;
+  dom.pdfLink.classList.remove("is-disabled");
+  dom.pdfLink.removeAttribute("aria-disabled");
+  dom.pdfLink.removeAttribute("tabindex");
+  dom.pdfLink.removeAttribute("title");
+}
+
+function variantToggles() {
+  return {
+    designed: dom.variantDesigned,
+    ats: dom.variantAts,
+    coverLetter: dom.variantCover,
+  };
 }
 
 function setVariant(variant) {
@@ -1203,14 +1314,14 @@ function setVariant(variant) {
   if (!files[variant]) return;
 
   state.variant = variant;
-  const isDesigned = variant === "designed";
 
-  dom.variantDesigned.classList.toggle("is-active", isDesigned);
-  dom.variantAts.classList.toggle("is-active", !isDesigned);
-  dom.variantDesigned.setAttribute("aria-pressed", String(isDesigned));
-  dom.variantAts.setAttribute("aria-pressed", String(!isDesigned));
-  dom.pdfLink.href = `${files[variant].pdf}?v=${Date.now()}`;
+  for (const [key, node] of Object.entries(variantToggles())) {
+    const active = key === variant;
+    node.classList.toggle("is-active", active);
+    node.setAttribute("aria-pressed", String(active));
+  }
 
+  updatePdfLink();
   updatePreviewMeta();
   refreshPreview();
 }
@@ -1220,7 +1331,8 @@ function updatePreviewMeta(payload = null) {
   const variant = variants?.[state.variant];
 
   if (!variant) {
-    dom.previewMeta.textContent = "";
+    dom.previewMeta.textContent =
+      state.variant === "coverLetter" ? "not built yet" : "";
     return;
   }
 
@@ -1241,6 +1353,7 @@ function init() {
   dom.refresh.addEventListener("click", () => refreshPreview());
   dom.variantDesigned.addEventListener("click", () => setVariant("designed"));
   dom.variantAts.addEventListener("click", () => setVariant("ats"));
+  dom.variantCover.addEventListener("click", () => setVariant("coverLetter"));
   dom.profileSelect.addEventListener("change", () =>
     switchProfile(dom.profileSelect.value),
   );

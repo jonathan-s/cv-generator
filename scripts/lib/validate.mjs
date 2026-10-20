@@ -15,7 +15,6 @@ export const LABEL_KEYS = [
   "languages",
   "tools",
   "hobbies",
-  "page",
 ];
 
 const isObject = (value) =>
@@ -59,17 +58,6 @@ export function validateCv(data) {
     for (const key of ["tagline", "birth", "address", "phone", "email"]) {
       if (data.basics[key] != null && !isString(data.basics[key])) {
         errors.push(`basics.${key} must be a string.`);
-      }
-    }
-  }
-
-  /* labels ---------------------------------------------------------------- */
-  if (!isObject(data.labels)) {
-    errors.push("labels is required.");
-  } else {
-    for (const key of LABEL_KEYS) {
-      if (!nonEmptyString(data.labels[key])) {
-        errors.push(`labels.${key} is required.`);
       }
     }
   }

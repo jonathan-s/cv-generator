@@ -38,8 +38,8 @@
         <h1>Content</h1>
         <p>
           Edit the fields below. Saving writes
-          <code id="data-path">data/*.json</code> and regenerates the HTML and PDF
-          for the selected profile.
+          <code id="data-path">data/*.json</code> and the cover letter Markdown,
+          then regenerates the HTML and PDFs for the selected profile.
         </p>
       </div>
 
@@ -57,9 +57,10 @@
           <span id="preview-meta" class="preview-bar__meta"></span>
         </div>
 
-        <div class="variant-toggle" role="group" aria-label="CV variant">
+        <div class="variant-toggle" role="group" aria-label="Preview variant">
           <button id="variant-designed" class="variant-btn is-active" type="button" aria-pressed="true">Designed</button>
           <button id="variant-ats" class="variant-btn" type="button" aria-pressed="false">ATS</button>
+          <button id="variant-cover" class="variant-btn" type="button" aria-pressed="false">Cover letter</button>
         </div>
         <div class="preview-bar__actions">
           <button id="rebuild" class="btn btn--ghost" type="button" title="Rebuild from the saved JSON">Rebuild</button>

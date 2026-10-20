@@ -1,6 +1,6 @@
 # Wakako Obata – CV
 
-A small pipeline with no npm dependencies that turns a JSON data profile into two A4 CV variants: a designed two-page CV and a plain single-column ATS version. Both are generated from the same data.
+A small pipeline with no npm dependencies that turns a JSON data profile into two A4 CV variants: a designed two-page CV and a plain single-column ATS version. Both are generated from the same data. An optional cover letter, written as Markdown, is built into its own A4 page that reuses the CV header (without the photo).
 
 Each JSON file in `data/` is one profile. Its file name (without `.json`) is the profile id, and it names the build outputs: `data/<id>.json` → `dist/<id>.html`, `dist/<id>.pdf`, `dist/<id>-ats.html`, `dist/<id>-ats.pdf`. The editor lets you switch between profiles with a dropdown at the top.
 
@@ -14,9 +14,9 @@ Start the local editor:
 npm run editor
 ```
 
-Open **http://127.0.0.1:8080**. The **Profile** dropdown in the top bar lists every JSON file in `data/`; the selection is kept in the URL (`?profile=<id>`) and in local storage, so a reload returns to the same profile. The page loads the selected profile into fields. **Save & rebuild** writes that JSON atomically, regenerates its HTML and PDF, and refreshes the preview. Use the **Designed / ATS** toggle in the preview bar; **Open PDF** follows the selected variant.
+Open **http://127.0.0.1:8080**. The **Profile** dropdown in the top bar lists every JSON file in `data/`; the selection is kept in the URL (`?profile=<id>`) and in local storage, so a reload returns to the same profile. The page loads the selected profile into fields. **Save & rebuild** writes that JSON (and the cover letter Markdown), regenerates the HTML and PDFs, and refreshes the preview. Use the **Designed / ATS / Cover letter** toggle in the preview bar; **Open PDF** follows the selected variant.
 
-Switching profiles with unsaved changes asks for confirmation, and saving only ever touches the selected `data/<id>.json` and its outputs — other profiles' JSON and builds are left alone.
+Switching profiles with unsaved changes asks for confirmation, and saving only ever touches the selected `data/<id>.json`, its optional `data/<id>.cover-letter.md` and their outputs — other profiles' files and builds are left alone.
 
 The server binds to `127.0.0.1` by default. Use `PORT=8081 npm run editor` to pick another port. It has no npm dependencies and uses the same validation module as the build (`scripts/lib/validate.mjs`), so invalid data is rejected before the JSON file is touched.
 
@@ -25,10 +25,14 @@ Useful endpoints (`profile` defaults to the first file in `data/` when omitted):
 ```text
 GET  /api/profiles             list profiles in data/ (+ which are built)
 GET  /api/cv?profile=<id>      current JSON for a profile
+GET  /api/cover-letter?profile=<id>  current cover letter Markdown
 GET  /api/build?profile=<id>   current build manifest for a profile
 PUT  /api/cv?profile=<id>      validate + write JSON + rebuild that profile
+PUT  /api/document?profile=<id> save { cv, coverLetter } in one go + rebuild
 POST /api/rebuild?profile=<id> rebuild a profile without writing JSON
 ```
+
+The editor saves through `PUT /api/document` with `{ "cv": { … }, "coverLetter": "# Markdown…" }`, so the JSON and the Markdown are written before a single rebuild. An empty `coverLetter` deletes the Markdown file instead of writing a blank one.
 
 ## Build
 
@@ -54,8 +58,11 @@ dist/
 ├── wakako-obata.pdf        # designed, exactly 2 A4 pages
 ├── wakako-obata-ats.html   # ATS HTML
 ├── wakako-obata-ats.pdf    # ATS, 2 A4 pages
+├── wakako-obata-cover-letter.html  # only when the letter exists
+├── wakako-obata-cover-letter.pdf   # one A4 page
 ├── cv.css                  # designed styles (shared)
 ├── cv-ats.css              # ATS styles (shared)
+├── cover-letter.css        # cover letter additions on top of cv.css
 ├── build.json              # manifest per profile: page counts and sizes
 └── assets/
     └── wakako-obata.jpg
@@ -73,13 +80,17 @@ CHROME_PATH="/path/to/chrome" npm run build
 
 ```
 data/<profile>.json         # the CV content, one file per profile (source of truth)
+data/<profile>.cover-letter.md  # optional cover letter, Markdown
 templates/cv.html           # designed HTML skeleton with {{tokens}}
 templates/cv-ats.html       # ATS HTML skeleton with {{tokens}}
+templates/cover-letter.html # cover letter skeleton (header + rendered Markdown)
 styles/cv.css               # designed layout, typography and print rules
 styles/cv-ats.css           # ATS layout and print rules
+styles/cover-letter.css     # letter body: 10pt, 88ch measure, Markdown elements
 scripts/build.mjs           # JSON profiles → HTMLs → PDFs
 scripts/lib/profiles.mjs    # profile discovery, output paths, build manifest
 scripts/lib/validate.mjs    # shared data validation
+scripts/lib/markdown.mjs    # small Markdown renderer (no dependencies)
 scripts/extract_docx.py     # helper: raw text extraction from the source DOCX
 server.mjs                  # local editor server
 editor/                     # editor UI (HTML/CSS/JS)
@@ -90,8 +101,9 @@ documents/                  # original DOCX/PDF (git-ignored)
 ## Editing the CV
 
 - **Content** – use `npm run editor` for the form editor, or edit a `data/<profile>.json` directly and run `npm run build`. Saving in the editor writes that JSON and rebuilds it automatically. To add a profile, copy an existing JSON file in `data/` under a new name and adjust it (the file name is the profile id and the output prefix).
-- **Look and feel** – edit `styles/cv.css` (designed) or `styles/cv-ats.css` (ATS). Screen preview and print share the same stylesheets; print rules are at the bottom of each file. Use the **Rebuild** button in the preview bar (or `POST /api/rebuild`) to pick up CSS changes without saving form changes.
-- **Markup** – edit `templates/cv.html` or `templates/cv-ats.html`. The `{{...}}` tokens are filled by `scripts/build.mjs`.
+- **Cover letter** – the editor's **Cover letter** card is a plain Markdown textarea backed by `data/<profile>.cover-letter.md`. The file is optional: no file (or an empty one) means no letter and no cover-letter PDF. Markdown support is deliberately small — paragraphs (blank line between them), `**bold**`, `*italic*`, `` `code` ``, `[links](https://…)`, `-`/`1.` lists, `#` headings, `>` quotes, `---` rules and fenced code. A single newline is a soft wrap; end a line with two spaces or `\` for a hard break. Raw HTML is escaped, and links are limited to `http(s)`, `mailto:`, `tel:` and relative targets.
+- **Look and feel** – edit `styles/cv.css` (designed), `styles/cv-ats.css` (ATS) or `styles/cover-letter.css` (letter body; it layers on top of `cv.css`). Screen preview and print share the same stylesheets; print rules are at the bottom of each file. Use the **Rebuild** button in the preview bar (or `POST /api/rebuild`) to pick up CSS changes without saving form changes.
+- **Markup** – edit `templates/cv.html`, `templates/cv-ats.html` or `templates/cover-letter.html`. The `{{...}}` tokens are filled by `scripts/build.mjs`.
 
 The build validates required fields and fails on unknown template tokens, so a typo in the template does not silently produce an empty section.
 
@@ -113,13 +125,15 @@ The build validates required fields and fails on unknown template tokens, so a t
 }
 ```
 
-`hobbies` is used by the designed variant only; the ATS variant omits that section.
+`hobbies` is used by the designed variant only; the ATS variant omits that section. The cover letter is not part of this JSON: it is a separate Markdown file, `data/<id>.cover-letter.md`, so letter text never has to be escaped inside JSON.
 
 ## How the two pages are kept
 
 The designed variant, `templates/cv.html`, contains two explicit `.page` articles. `styles/cv.css` gives each one an A4 width and a 296 mm minimum height, and the print block sets `@page { size: A4; margin: 0 }`. This makes Chrome emit exactly two pages instead of reflowing into a third.
 
 The ATS variant, `templates/cv-ats.html`, is a single flowing column. Chrome paginates it naturally; it currently fits two pages. The build warns if either variant is not exactly two pages.
+
+The cover letter, `templates/cover-letter.html`, is a single explicit `.page` built from the same `cv.css` page rules, so it prints as exactly one A4 page; the build expects one page and warns otherwise. Its body is capped at `88ch` with 10 pt type for a comfortable line length, so a normal letter stays well inside the page.
 
 Page 1 holds the profile and full work history. Page 2 holds education, volunteer work, skills, and the extras block: languages, EDV and — designed variant only — hobbies.
 

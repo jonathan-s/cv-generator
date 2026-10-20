@@ -34,14 +34,22 @@ export function profilePaths(root, id) {
   return {
     id,
     dataFile: join(dataDir(root), `${id}.json`),
+    coverLetterFile: join(dataDir(root), `${id}.cover-letter.md`),
     outDir,
     html: join(outDir, `${id}.html`),
     pdf: join(outDir, `${id}.pdf`),
     atsHtml: join(outDir, `${id}-ats.html`),
     atsPdf: join(outDir, `${id}-ats.pdf`),
+    coverLetterHtml: join(outDir, `${id}-cover-letter.html`),
+    coverLetterPdf: join(outDir, `${id}-cover-letter.pdf`),
   };
 }
 
+/**
+ * Paths the build always produces. The cover letter is optional (it only
+ * exists when data/<id>.cover-letter.md has content), so it is not part of
+ * this list.
+ */
 export function profileOutputs(paths) {
   return [paths.html, paths.pdf, paths.atsHtml, paths.atsPdf];
 }

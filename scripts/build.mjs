@@ -21,6 +21,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { validateCv } from "./lib/validate.mjs";
+import { renderMarkdown } from "./lib/markdown.mjs";
 import {
   assertProfileId,
   listProfiles,
@@ -260,6 +261,7 @@ const buildTokens = (data) => {
 const templates = {
   designed: join(root, "templates", "cv.html"),
   ats: join(root, "templates", "cv-ats.html"),
+  coverLetter: join(root, "templates", "cover-letter.html"),
 };
 
 const stylesheets = {
@@ -271,30 +273,49 @@ const stylesheets = {
     source: join(root, "styles", "cv-ats.css"),
     name: "cv-ats.css",
   },
+  coverLetter: {
+    source: join(root, "styles", "cover-letter.css"),
+    name: "cover-letter.css",
+  },
 };
 
-const variantsFor = (paths) => [
-  {
-    key: "designed",
-    label: "Designed",
-    template: templates.designed,
-    stylesheet: stylesheets.designed.source,
-    stylesheetName: stylesheets.designed.name,
-    html: paths.html,
-    pdf: paths.pdf,
-    expectedPages: 2,
-  },
-  {
-    key: "ats",
-    label: "ATS",
-    template: templates.ats,
-    stylesheet: stylesheets.ats.source,
-    stylesheetName: stylesheets.ats.name,
-    html: paths.atsHtml,
-    pdf: paths.atsPdf,
-    expectedPages: 2,
-  },
-];
+const variantsFor = (paths, hasCoverLetter = false) => {
+  const variants = [
+    {
+      key: "designed",
+      label: "Designed",
+      template: templates.designed,
+      stylesheets: [stylesheets.designed],
+      html: paths.html,
+      pdf: paths.pdf,
+      expectedPages: 2,
+    },
+    {
+      key: "ats",
+      label: "ATS",
+      template: templates.ats,
+      stylesheets: [stylesheets.ats],
+      html: paths.atsHtml,
+      pdf: paths.atsPdf,
+      expectedPages: 2,
+    },
+  ];
+
+  if (hasCoverLetter) {
+    variants.push({
+      key: "coverLetter",
+      label: "Cover letter",
+      template: templates.coverLetter,
+      /* cv.css carries the identity header, palette and print rules */
+      stylesheets: [stylesheets.designed, stylesheets.coverLetter],
+      html: paths.coverLetterHtml,
+      pdf: paths.coverLetterPdf,
+      expectedPages: 1,
+    });
+  }
+
+  return variants;
+};
 
 async function renderTemplate(variant, tokens) {
   const template = await readFile(variant.template, "utf8");
@@ -314,6 +335,18 @@ async function renderTemplate(variant, tokens) {
   }
 
   return html;
+}
+
+/* Cover letter source (optional): data/<id>.cover-letter.md */
+async function readCoverLetter(file) {
+  try {
+    return await readFile(file, "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") return "";
+    throw new Error(
+      `Could not read ${relative(root, file)}: ${error.message}`,
+    );
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -362,12 +395,27 @@ for (const id of profileIds) {
   );
 
   const tokens = buildTokens(data);
-  const variants = variantsFor(paths);
+  const coverLetter = await readCoverLetter(paths.coverLetterFile);
+  const hasCoverLetter = coverLetter.trim().length > 0;
+
+  if (hasCoverLetter) {
+    tokens.letter = renderMarkdown(coverLetter);
+  } else {
+    /* the markdown file was removed or emptied: drop stale outputs */
+    await rm(paths.coverLetterHtml, { force: true });
+    await rm(paths.coverLetterPdf, { force: true });
+  }
+
+  const variants = variantsFor(paths, hasCoverLetter);
 
   for (const variant of variants) {
     const html = await renderTemplate(variant, tokens);
     await writeFile(variant.html, html, "utf8");
-    await cp(variant.stylesheet, join(outDir, variant.stylesheetName));
+
+    for (const stylesheet of variant.stylesheets) {
+      await cp(stylesheet.source, join(outDir, stylesheet.name));
+    }
+
     console.log(`✓ ${relative(root, variant.html)}`);
   }
 
@@ -488,7 +536,7 @@ if (!htmlOnly) {
       variant.sizeKb = Math.round(info.size / 1024);
 
       console.log(
-        `✓ ${relative(root, variant.pdf)} (${variant.pageCount ? `${variant.pageCount} pages, ` : ""}${variant.sizeKb} KB)`,
+        `✓ ${relative(root, variant.pdf)} (${variant.pageCount ? `${variant.pageCount} ${variant.pageCount === 1 ? "page" : "pages"}, ` : ""}${variant.sizeKb} KB)`,
       );
 
       if (
@@ -496,7 +544,9 @@ if (!htmlOnly) {
         variant.pageCount !== variant.expectedPages
       ) {
         console.warn(
-          `⚠ ${variant.label} expected ${variant.expectedPages} pages, got ${variant.pageCount} — check ${relative(root, variant.stylesheet)}`,
+          `⚠ ${variant.label} expected ${variant.expectedPages} pages, got ${variant.pageCount} — check ${variant.stylesheets
+            .map((stylesheet) => relative(root, stylesheet.source))
+            .join(", ")}`,
         );
       }
     }

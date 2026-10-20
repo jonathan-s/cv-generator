@@ -15,7 +15,7 @@
 
 import { createServer } from "node:http";
 import { createReadStream, existsSync, statSync } from "node:fs";
-import { readFile, rename, stat, writeFile } from "node:fs/promises";
+import { readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { dirname, extname, join, resolve, sep } from "node:path";
@@ -279,6 +279,37 @@ async function writeData(profile, data) {
 }
 
 /* -------------------------------------------------------------------------- */
+/* cover letter                                                               */
+/* -------------------------------------------------------------------------- */
+
+/** The letter is optional: a missing file simply means an empty letter. */
+async function readCoverLetter(profile) {
+  try {
+    return await readFile(profile.coverLetterFile, "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") return "";
+    throw new HttpError(
+      500,
+      `Could not read data/${profile.id}.cover-letter.md.`,
+    );
+  }
+}
+
+/** Writes the markdown atomically; an empty letter removes the file. */
+async function writeCoverLetter(profile, markdown) {
+  if (!markdown.trim()) {
+    await rm(profile.coverLetterFile, { force: true });
+    return false;
+  }
+
+  const temporary = `${profile.coverLetterFile}.tmp`;
+  const content = markdown.endsWith("\n") ? markdown : `${markdown}\n`;
+  await writeFile(temporary, content, "utf8");
+  await rename(temporary, profile.coverLetterFile);
+  return true;
+}
+
+/* -------------------------------------------------------------------------- */
 /* API handlers                                                               */
 /* -------------------------------------------------------------------------- */
 
@@ -322,6 +353,17 @@ async function handleGetBuild(res, profile) {
   sendJson(res, 200, { ok: true, ...(await buildPayload(profile.id)) });
 }
 
+async function handleGetCoverLetter(res, profile) {
+  const markdown = await readCoverLetter(profile);
+
+  sendJson(res, 200, {
+    profile: profile.id,
+    file: `data/${profile.id}.cover-letter.md`,
+    exists: markdown.trim().length > 0,
+    markdown,
+  });
+}
+
 async function handleSave(req, res, profile) {
   const data = await readJsonBody(req);
   const errors = validateForSave(data);
@@ -362,6 +404,84 @@ async function handleSave(req, res, profile) {
     sendJson(res, error.status || 500, {
       ok: false,
       saved,
+      profile: profile.id,
+      error: error.message,
+      details: error.details || null,
+    });
+  }
+}
+
+/**
+ * Combined save used by the editor: CV JSON + cover letter markdown, then a
+ * single rebuild. Both files are written before the build starts.
+ */
+async function handleSaveDocument(req, res, profile) {
+  const body = await readJsonBody(req);
+  const data = body?.cv;
+  const markdown = body?.coverLetter;
+
+  const errors = [];
+
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    errors.push("cv must be a JSON object.");
+  } else {
+    errors.push(...validateForSave(data));
+  }
+
+  if (markdown != null && typeof markdown !== "string") {
+    errors.push("coverLetter must be a string.");
+  }
+
+  if (errors.length) {
+    sendJson(res, 422, {
+      ok: false,
+      saved: false,
+      profile: profile.id,
+      errors,
+    });
+    return;
+  }
+
+  let saved = false;
+  let savedCoverLetter = false;
+
+  try {
+    const result = await enqueue(async () => {
+      await writeData(profile, data);
+      saved = true;
+      console.log(`Saved data/${profile.id}.json`);
+
+      if (markdown != null) {
+        savedCoverLetter = await writeCoverLetter(profile, markdown);
+        console.log(
+          savedCoverLetter
+            ? `Saved data/${profile.id}.cover-letter.md`
+            : `Removed data/${profile.id}.cover-letter.md (empty letter)`,
+        );
+      }
+
+      return runBuild(profile.id);
+    });
+
+    console.log(`Rebuilt ${profile.id} in ${result.durationMs} ms`);
+    const build = await buildPayload(profile.id);
+    sendJson(res, 200, {
+      ok: true,
+      saved: true,
+      savedCoverLetter,
+      coverLetterFile: `data/${profile.id}.cover-letter.md`,
+      ...build,
+      durationMs: result.durationMs,
+      log: result.log,
+      warnings: result.warnings,
+    });
+  } catch (error) {
+    console.error(error.message);
+    if (error.details) console.error(error.details);
+    sendJson(res, error.status || 500, {
+      ok: false,
+      saved,
+      savedCoverLetter,
       profile: profile.id,
       error: error.message,
       details: error.details || null,
@@ -461,8 +581,18 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === "GET" && pathname === "/api/cover-letter") {
+      await handleGetCoverLetter(res, await resolveProfile(url));
+      return;
+    }
+
     if (req.method === "PUT" && pathname === "/api/cv") {
       await handleSave(req, res, await resolveProfile(url));
+      return;
+    }
+
+    if (req.method === "PUT" && pathname === "/api/document") {
+      await handleSaveDocument(req, res, await resolveProfile(url));
       return;
     }
 
@@ -513,13 +643,21 @@ async function start() {
   if (!profiles.length) {
     console.log("No data profiles found. Add a JSON file to data/.");
   } else {
-    const needsBuild = profiles.some(
-      (profile) =>
-        !manifest.profiles[profile.id] ||
-        profileOutputs(profilePaths(root, profile.id)).some(
-          (file) => !existsSync(file),
-        ),
-    );
+    const needsBuild = profiles.some((profile) => {
+      const profilePath = profilePaths(root, profile.id);
+      const missing = profileOutputs(profilePath).some(
+        (file) => !existsSync(file),
+      );
+
+      if (!manifest.profiles[profile.id] || missing) return true;
+
+      /* an existing cover letter must have its HTML and PDF as well */
+      return (
+        existsSync(profilePath.coverLetterFile) &&
+        (!existsSync(profilePath.coverLetterHtml) ||
+          !existsSync(profilePath.coverLetterPdf))
+      );
+    });
 
     if (needsBuild) {
       console.log("No complete build found — generating the HTML/PDFs…");

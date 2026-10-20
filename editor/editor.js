@@ -9,8 +9,7 @@ const DEFAULT_LABELS = {
   experience: "Beruflicher Werdegang",
   education: "Studium und Weiterbildung",
   volunteer: "Aktivitäten für Verkehrswende",
-  skills: "Fachliche Kenntnisse",
-  competencies: "Persönliche Kompetenzen",
+  skills: "Kernkompetenz",
   extras: "Weitere Kenntnisse",
   languages: "Sprachen",
   tools: "EDV",
@@ -23,7 +22,6 @@ const LABEL_FIELDS = [
   ["education", "Education"],
   ["volunteer", "Volunteer work"],
   ["skills", "Technical skills"],
-  ["competencies", "Personal competencies"],
   ["extras", "Further skills"],
   ["languages", "Languages"],
   ["tools", "Software / tools"],
@@ -284,7 +282,7 @@ function normalizeData(input) {
 
   data.skills =
     data.skills && typeof data.skills === "object" ? data.skills : {};
-  for (const key of ["technical", "personal", "tools"]) {
+  for (const key of ["technical", "tools"]) {
     data.skills[key] = Array.isArray(data.skills[key])
       ? data.skills[key]
       : [];
@@ -618,13 +616,6 @@ function renderSkills(data) {
         listEditor(data.skills.technical, {
           addLabel: "Add skill",
           placeholder: "Skill",
-        }),
-      ),
-      subcard(
-        "Personal competencies",
-        listEditor(data.skills.personal, {
-          addLabel: "Add competency",
-          placeholder: "Competency",
         }),
       ),
       subcard(

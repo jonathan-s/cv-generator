@@ -153,17 +153,5 @@ export function validateCv(data) {
     errors.push("hobbies must be an array of strings.");
   }
 
-  /* closing --------------------------------------------------------------- */
-  if (!isObject(data.closing)) {
-    errors.push("closing is required.");
-  } else {
-    if (!nonEmptyString(data.closing.place)) {
-      errors.push("closing.place is required.");
-    }
-    if (!nonEmptyString(data.closing.date)) {
-      errors.push("closing.date is required.");
-    }
-  }
-
   return errors;
 }

@@ -14,7 +14,6 @@ const DEFAULT_LABELS = {
   extras: "Weitere Kenntnisse",
   languages: "Sprachen",
   tools: "EDV",
-  hobbies: "Hobbys",
   page: "Seite 2 / 2",
 };
 
@@ -28,7 +27,6 @@ const LABEL_FIELDS = [
   ["extras", "Further skills"],
   ["languages", "Languages"],
   ["tools", "Software / tools"],
-  ["hobbies", "Hobbies"],
   ["page", "Page 2 label"],
 ];
 
@@ -300,7 +298,6 @@ function normalizeData(input) {
     if (typeof language.levelLabel !== "string") language.levelLabel = "";
   }
 
-  data.hobbies = Array.isArray(data.hobbies) ? data.hobbies : [];
   data.closing =
     data.closing && typeof data.closing === "object" ? data.closing : {};
 
@@ -323,7 +320,6 @@ function render() {
     ...ENTRY_SECTIONS.map((section) => renderEntrySection(section, data)),
     renderSkills(data),
     renderLanguages(data),
-    renderHobbies(data),
     renderClosing(data),
   );
 
@@ -719,20 +715,6 @@ function renderLanguages(data) {
           { class: "btn btn--small list-add" },
         ),
       ),
-    ],
-  );
-}
-
-function renderHobbies(data) {
-  return card(
-    "hobbies",
-    "Hobbies",
-    "Rendered in the Weitere Kenntnisse block on page 2. Omitted from the ATS variant.",
-    [
-      listEditor(data.hobbies, {
-        addLabel: "Add hobby",
-        placeholder: "Hobby",
-      }),
     ],
   );
 }

@@ -7,6 +7,11 @@
  *   - unordered lists, 1. ordered lists
  *   # headings (rendered one level lower, so "#" -> <h2>)
  *   > block quotes, --- horizontal rules, ``` fenced code blocks
+ *   -> right-aligned lines (e.g. the place and date above the subject line)
+ *
+ * The "-> " prefix is the only alignment syntax Markdown itself has none for:
+ * consecutive prefixed lines form one right-aligned paragraph, so multi-line
+ * blocks stay left-aligned per line and read normally.
  *
  * Everything else is escaped. Raw HTML in the source is shown as text, never
  * interpreted, and links are limited to http(s), mailto, tel and relative
@@ -32,6 +37,7 @@ const HEADING = /^(#{1,6})\s+(.*)$/;
 const QUOTE = /^>\s?/;
 const UNORDERED = /^\s*[-*+]\s+(.*)$/;
 const ORDERED = /^\s*\d+[.)]\s+(.*)$/;
+const RIGHT = /^\s*->\s+(.*)$/;
 
 const startsBlock = (line) =>
   FENCE.test(line) ||
@@ -39,7 +45,8 @@ const startsBlock = (line) =>
   HEADING.test(line) ||
   QUOTE.test(line) ||
   UNORDERED.test(line) ||
-  ORDERED.test(line);
+  ORDERED.test(line) ||
+  RIGHT.test(line);
 
 /** Keeps links to safe schemes and paths; anything else is left as text. */
 function safeHref(href) {
@@ -84,7 +91,7 @@ function renderInline(text) {
 }
 
 /** Joins the lines of one paragraph, honouring explicit hard breaks. */
-function renderParagraph(lines) {
+function renderParagraph(lines, className) {
   const parts = [];
 
   lines.forEach((raw, index) => {
@@ -96,7 +103,8 @@ function renderParagraph(lines) {
     parts.push(renderInline(raw.trim().replace(/\\$/, "")));
   });
 
-  return `<p>${parts.join("")}</p>`;
+  const attribute = className ? ` class="${className}"` : "";
+  return `<p${attribute}>${parts.join("")}</p>`;
 }
 
 function renderBlocks(lines) {
@@ -183,6 +191,19 @@ function renderBlocks(lines) {
         .map((item) => `<li>${renderInline(item)}</li>`)
         .join("\n");
       html.push(`<${tag}>\n${body}\n</${tag}>`);
+      continue;
+    }
+
+    /* right-aligned block ----------------------------------------------- */
+    if (RIGHT.test(line)) {
+      const body = [];
+
+      while (index < lines.length && RIGHT.test(lines[index])) {
+        body.push(RIGHT.exec(lines[index])[1]);
+        index += 1;
+      }
+
+      html.push(renderParagraph(body, "align-right"));
       continue;
     }
 

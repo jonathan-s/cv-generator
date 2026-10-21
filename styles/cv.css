@@ -15,7 +15,14 @@
   --paper: #ffffff;
   --desk: #e9e5e1;
 
-  --sans: "Helvetica Neue", "HelveticaNeue", Helvetica, Arial, "Segoe UI", sans-serif;
+  /* Helvetica Neue Light is the text face throughout. macOS ships the Light
+     cut as its own family, so it leads the stack. The Light family has no bold
+     member, so emphasised text is routed to --sans-bold to get a real bold
+     face instead of a synthetically emboldened Light. */
+  --sans: "Helvetica Neue Light", "HelveticaNeue-Light", "Helvetica Neue",
+    "HelveticaNeue", Helvetica, Arial, "Segoe UI", sans-serif;
+  --sans-bold: "Helvetica Neue", "HelveticaNeue", Helvetica, Arial,
+    "Segoe UI", sans-serif;
 
   --page-width: 210mm;
   --page-height: 296mm;
@@ -39,7 +46,7 @@ body {
   font-family: var(--sans);
   font-size: 10pt;
   line-height: 1.28;
-  font-weight: 400;
+  font-weight: 300;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   font-variant-ligatures: none;
@@ -164,6 +171,7 @@ p {
   padding-bottom: 1.1mm;
   border-bottom: 0.4pt solid var(--rule);
   color: var(--ink);
+  font-family: var(--sans-bold);
   font-size: 9.2pt;
   font-weight: 700;
   line-height: 1.2;
@@ -205,6 +213,7 @@ p {
 .entry__title {
   margin: 0;
   color: var(--ink);
+  font-family: var(--sans-bold);
   font-size: 10.5pt;
   font-weight: 700;
   line-height: 1.3;
@@ -295,6 +304,7 @@ p {
   display: inline;
   margin-right: 1.5mm;
   color: var(--ink);
+  font-family: var(--sans-bold);
   font-size: 8.8pt;
   font-weight: 700;
   letter-spacing: 0.08em;

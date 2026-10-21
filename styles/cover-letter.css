@@ -26,8 +26,9 @@
 .letter__body {
   margin-top: 8mm;
   color: var(--text);
-  font-size: 12pt;
+  font-size: 11pt;
   line-height: 1.5;
+  text-align: justify;
   hyphens: manual;
   -webkit-hyphens: manual;
 }
@@ -44,6 +45,12 @@
   margin-bottom: 0;
 }
 
+/* `-> text` in the Markdown source: right-aligned line, e.g. place and date */
+.letter__body p.align-right {
+  text-align: right;
+}
+
+.letter__body h1,
 .letter__body h2,
 .letter__body h3,
 .letter__body h4,
@@ -51,7 +58,8 @@
 .letter__body h6 {
   margin: 5mm 0 2mm;
   color: var(--ink);
-  font-weight: 700;
+  font-family: var(--sans-bold);
+  font-weight: 300;
   line-height: 1.3;
   break-after: avoid;
   page-break-after: avoid;
@@ -93,6 +101,7 @@
 
 .letter__body strong {
   color: var(--ink);
+  font-family: var(--sans-bold);
   font-weight: 700;
 }
 

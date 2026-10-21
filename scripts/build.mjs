@@ -19,9 +19,9 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { tmpdir } from "node:os";
 import { validateCv } from "./lib/validate.mjs";
 import { renderMarkdown } from "./lib/markdown.mjs";
+import { launchBrowser } from "./lib/chrome.mjs";
 import {
   assertProfileId,
   listProfiles,
@@ -430,25 +430,6 @@ for (const id of profileIds) {
 /* -------------------------------------------------------------------------- */
 
 if (!htmlOnly) {
-  const chromeCandidates = [
-    process.env.CHROME_PATH,
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    "/Applications/Chromium.app/Contents/MacOS/Chromium",
-    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-    "/usr/bin/google-chrome",
-    "/usr/bin/google-chrome-stable",
-    "/usr/bin/chromium",
-    "/usr/bin/chromium-browser",
-  ].filter(Boolean);
-
-  const chrome = chromeCandidates.find((candidate) => existsSync(candidate));
-
-  if (!chrome) {
-    throw new Error(
-      "Chrome/Chromium not found. Set CHROME_PATH or use --html-only.",
-    );
-  }
-
   const gsCandidates = [
     process.env.GS_PATH,
     "/opt/homebrew/bin/gs",
@@ -497,58 +478,63 @@ if (!htmlOnly) {
     return null;
   }
 
-  for (const item of built) {
-    for (const variant of item.variants) {
-      const profileDir = join(
-        tmpdir(),
-        `cv-chrome-${process.pid}-${item.id}-${variant.key}`,
-      );
+  /* Starts `worker` for every item, but only `limit` at a time. */
+  async function runLimited(items, limit, worker) {
+    let next = 0;
+    const runners = Array.from(
+      { length: Math.min(limit, items.length) },
+      async () => {
+        for (;;) {
+          const index = next++;
+          if (index >= items.length) return;
+          await worker(items[index], index);
+        }
+      },
+    );
+    await Promise.all(runners);
+  }
 
-      try {
-        await execFileAsync(
-          chrome,
-          [
-            "--headless=new",
-            "--disable-gpu",
-            "--hide-scrollbars",
-            "--no-first-run",
-            "--no-default-browser-check",
-            "--no-pdf-header-footer",
-            "--run-all-compositor-stages-before-draw",
-            "--virtual-time-budget=5000",
-            `--user-data-dir=${profileDir}`,
-            `--print-to-pdf=${variant.pdf}`,
-            pathToFileURL(variant.html).href,
-          ],
-          { timeout: 120_000, maxBuffer: 10 * 1024 * 1024 },
-        );
-      } finally {
-        await rm(profileDir, { recursive: true, force: true });
-      }
+  const variants = built.flatMap((item) => item.variants);
 
-      const info = await stat(variant.pdf);
+  /* One Chrome boot prints every variant; each print gets its own tab, so a
+     few of them can run at the same time. */
+  const browser = await launchBrowser();
+
+  try {
+    await runLimited(variants, 4, async (variant) => {
+      const bytes = await browser.printPdf(pathToFileURL(variant.html).href);
       requireField(
-        info.size > 1000,
+        bytes.length > 1000,
         `${variant.label} PDF is unexpectedly small`,
       );
+      await writeFile(variant.pdf, bytes);
+      variant.sizeKb = Math.round(bytes.length / 1024);
+    });
+  } finally {
+    await browser.close();
+  }
 
+  /* Page counts are informational, so read them all at once. */
+  await Promise.all(
+    variants.map(async (variant) => {
       variant.pageCount = await getPdfPageCount(variant.pdf);
-      variant.sizeKb = Math.round(info.size / 1024);
+    }),
+  );
 
-      console.log(
-        `✓ ${relative(root, variant.pdf)} (${variant.pageCount ? `${variant.pageCount} ${variant.pageCount === 1 ? "page" : "pages"}, ` : ""}${variant.sizeKb} KB)`,
+  for (const variant of variants) {
+    console.log(
+      `✓ ${relative(root, variant.pdf)} (${variant.pageCount ? `${variant.pageCount} ${variant.pageCount === 1 ? "page" : "pages"}, ` : ""}${variant.sizeKb} KB)`,
+    );
+
+    if (
+      variant.pageCount !== null &&
+      variant.pageCount !== variant.expectedPages
+    ) {
+      console.warn(
+        `⚠ ${variant.label} expected ${variant.expectedPages} pages, got ${variant.pageCount} — check ${variant.stylesheets
+          .map((stylesheet) => relative(root, stylesheet.source))
+          .join(", ")}`,
       );
-
-      if (
-        variant.pageCount !== null &&
-        variant.pageCount !== variant.expectedPages
-      ) {
-        console.warn(
-          `⚠ ${variant.label} expected ${variant.expectedPages} pages, got ${variant.pageCount} — check ${variant.stylesheets
-            .map((stylesheet) => relative(root, stylesheet.source))
-            .join(", ")}`,
-        );
-      }
     }
   }
 }

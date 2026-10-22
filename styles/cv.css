@@ -189,7 +189,7 @@ p {
 /* ---- entries ------------------------------------------------------------- */
 
 .entry {
-  margin: 0 0 4mm;
+  margin: 0 0 2mm;
   break-inside: avoid;
   page-break-inside: avoid;
 }

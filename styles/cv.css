@@ -27,7 +27,7 @@
   --page-width: 210mm;
   --page-pad-x: 14mm;
   --sheet-pad-top: 10mm;
-  --sheet-pad-bottom: 12mm;
+  --sheet-pad-bottom: 10mm;
   /* top page margin, holds the running banner */
   --banner-band: 22mm;
 }
@@ -387,9 +387,10 @@ p {
 }
 
 @media print {
+  /* no width here: the page content box is already 182mm, and forcing 210mm
+     makes Chrome shrink the whole layout to fit */
   html,
   body {
-    width: 210mm;
     background: #fff;
   }
 

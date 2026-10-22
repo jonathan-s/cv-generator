@@ -10,8 +10,8 @@
  * to fd 3 and read from fd 4, so no WebSocket client (and no dependency) is
  * needed. One browser boot is then shared by every PDF in the build.
  *
- * Printing uses Page.printToPDF with `preferCSSPageSize`, so `@page { size: A4;
- * margin: 0 }` in the stylesheet stays authoritative, exactly like before.
+ * Printing uses Page.printToPDF with `preferCSSPageSize`, so the `@page` rule
+ * in the stylesheet stays authoritative, exactly like before.
  */
 
 import { spawn } from "node:child_process";

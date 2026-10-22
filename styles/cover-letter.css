@@ -19,9 +19,9 @@
 }
 
 /*
- * Full text column at 12pt (the clear-print minimum): ~85 characters per line
- * at the CV's 182mm measure. A fixed ch/em cap would leave a wide empty right
- * margin and break the alignment with the header rule, so none is used.
+ * Full text column at 11pt: ~85 characters per line at the CV's 182mm measure.
+ * A fixed ch/em cap would leave a wide empty right margin and break the
+ * alignment with the header rule, so none is used.
  */
 .letter__body {
   margin-top: 8mm;

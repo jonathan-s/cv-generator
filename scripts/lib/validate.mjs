@@ -14,6 +14,7 @@ export const LABEL_KEYS = [
   "extras",
   "languages",
   "tools",
+  "pagePrefix",
   "hobbies",
 ];
 

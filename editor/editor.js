@@ -13,7 +13,7 @@ const DEFAULT_LABELS = {
   extras: "Weitere Kenntnisse",
   languages: "Sprachen",
   tools: "EDV",
-  page: "Seite 2 / 2",
+  pagePrefix: "Seite",
 };
 
 const LABEL_FIELDS = [
@@ -25,7 +25,11 @@ const LABEL_FIELDS = [
   ["extras", "Further skills"],
   ["languages", "Languages"],
   ["tools", "Software / tools"],
-  ["page", "Page 2 label"],
+  [
+    "pagePrefix",
+    "Running banner label",
+    "The banner on every page but the first prints this label, then the page counters. Only the word belongs here — numbers are generated.",
+  ],
 ];
 
 const ENTRY_SECTIONS = [
@@ -511,15 +515,16 @@ function renderLabels(data) {
   return card(
     "labels",
     "Section headings",
-    "Rendered as uppercase headings in the CV.",
+    "Rendered as uppercase headings in the CV. The running banner label is the exception: it sits beside the page numbers.",
     [
       grid(
-        ...LABEL_FIELDS.map(([key, label]) =>
+        ...LABEL_FIELDS.map(([key, label, hint]) =>
           field(
             label,
             textInput(data.labels[key] ?? "", (value) => {
               data.labels[key] = value;
             }),
+            hint,
           ),
         ),
       ),

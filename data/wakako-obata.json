@@ -23,7 +23,7 @@
     "extras": "Weitere Kenntnisse",
     "languages": "Sprachen",
     "tools": "EDV",
-    "page": "",
+    "pagePrefix": "Seite",
     "competencies": "Persönliche Kompetenzen",
     "hobbies": "Hobbys"
   },

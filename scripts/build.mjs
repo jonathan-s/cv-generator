@@ -104,6 +104,10 @@ const requireField = (condition, message) => {
   if (!condition) throw new Error(`CV data error: ${message}`);
 };
 
+/* CSS string escaping, for values injected into the <style> block */
+const escapeCssString = (value = "") =>
+  String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/[\r\n]+/g, " ");
+
 const renderListItems = (items = []) =>
   items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
 
@@ -249,6 +253,13 @@ const buildTokens = (data) => {
     hobbiesInline: renderInlineList(data.hobbies, " · "),
     closingPlace: escapeHtml(data.closing.place ?? ""),
     closingDate: escapeHtml(data.closing.date ?? ""),
+    nameCss: escapeCssString(data.basics.name),
+    /* trailing space belongs to the prefix: an empty label leaves no gap */
+    pagePrefixCss: escapeCssString(
+      String(data.labels.pagePrefix ?? "").trim()
+        ? `${String(data.labels.pagePrefix).trim()} `
+        : "",
+    ),
   };
 
   for (const [key, value] of Object.entries(data.labels)) {

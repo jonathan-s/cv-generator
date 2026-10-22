@@ -4,7 +4,7 @@ A small pipeline with no npm dependencies that turns a JSON data profile into tw
 
 Each JSON file in `data/` is one profile. Its file name (without `.json`) is the profile id, and it names the build outputs: `data/<id>.json` → `dist/<id>.html`, `dist/<id>.pdf`, `dist/<id>-ats.html`, `dist/<id>-ats.pdf`. The editor lets you switch between profiles with a dropdown at the top.
 
-The designed layout follows the **Madelin Parker two-page A4** reference: a circular photo, large name, tagline, contact rows, thin section rules, bold uppercase section headings, single-column body copy, compact multi-column lists for skills, and a repeated name on page 2. The ATS variant deliberately drops the photo, columns, decorative dots and hobbies, using plain text and standard German headings instead.
+The designed layout follows the **Madelin Parker two-page A4** reference: a circular photo, large name, tagline, contact rows, thin section rules, bold uppercase section headings, single-column body copy, compact multi-column lists for skills, and a repeated name in the page margin of every sheet after the first. The ATS variant deliberately drops the photo, columns, decorative dots and hobbies, using plain text and standard German headings instead.
 
 ## Editor
 
@@ -86,7 +86,7 @@ templates/cv-ats.html       # ATS HTML skeleton with {{tokens}}
 templates/cover-letter.html # cover letter skeleton (header + rendered Markdown)
 styles/cv.css               # designed layout, typography and print rules
 styles/cv-ats.css           # ATS layout and print rules
-styles/cover-letter.css     # letter body: 12pt, full-width measure, Markdown elements
+styles/cover-letter.css     # letter body: 11pt justified, full-width measure, Markdown elements
 scripts/build.mjs           # JSON profiles → HTMLs → PDFs
 scripts/lib/profiles.mjs    # profile discovery, output paths, build manifest
 scripts/lib/validate.mjs    # shared data validation
@@ -113,7 +113,7 @@ The build validates required fields and fails on unknown template tokens, so a t
 {
   "meta":       { "language": "de", "title": "…" },
   "basics":     { "name": "…", "tagline": "…", "photo": "assets/…", "birth": "…", "address": "…", "phone": "…", "email": "…" },
-  "labels":     { "summary": "Profil", "experience": "Beruflicher Werdegang", "extras": "Weitere Kenntnisse", "…": "…" },
+  "labels":     { "summary": "Profil", "experience": "Beruflicher Werdegang", "extras": "Weitere Kenntnisse", "pagePrefix": "Seite", "…": "…" },
   "summary":    ["paragraph", "paragraph"],
   "experience": [{ "title": "…", "company": "…", "location": "…", "period": "…", "highlights": ["…"] }],
   "education":  [{ "title": "…", "institution": "…", "location": "…", "period": "…", "highlights": ["…"] }],
@@ -127,15 +127,31 @@ The build validates required fields and fails on unknown template tokens, so a t
 
 `hobbies` is used by the designed variant only; the ATS variant omits that section. The cover letter is not part of this JSON: it is a separate Markdown file, `data/<id>.cover-letter.md`, so letter text never has to be escaped inside JSON.
 
-## How the two pages are kept
+## How the pages are kept
 
-The designed variant, `templates/cv.html`, contains two explicit `.page` articles. `styles/cv.css` gives each one an A4 width and a 296 mm minimum height, and the print block sets `@page { size: A4; margin: 0 }`. This makes Chrome emit exactly two pages instead of reflowing into a third.
+The designed variant, `templates/cv.html`, is one continuous flow — the same model as the ATS variant. There are no hand-drawn pages, so content growth pushes onto a new sheet instead of overflowing a fixed page box and stranding the second page behind a stray scrap.
 
-The ATS variant, `templates/cv-ats.html`, is a single flowing column. Chrome paginates it naturally; it currently fits two pages. The build warns if either variant is not exactly two pages.
+Print page furniture comes from page margin boxes in `styles/cv.css`. Chrome paints them once per sheet, outside the flow:
 
-The cover letter, `templates/cover-letter.html`, is a single explicit `.page` built from the same `cv.css` page rules, so it prints as exactly one A4 page; the build expects one page and warns otherwise. Its body uses the full 182 mm text column at 12 pt (the clear-print minimum), which works out to roughly 85 characters per line, and it shares the header's left and right edges. A narrower `ch`/`em` cap was rejected: it left a wide empty right margin that no longer lined up with the header rule.
+```css
+@page {
+  size: A4;
+  margin: 22mm 14mm 12mm;   /* the top margin is the banner band */
+  @top-left  { content: var(--cv-name); … }
+  @top-right { content: var(--cv-page-prefix) " " counter(page) " / " counter(pages); }
+}
+@page :first { margin-top: 10mm; @top-left { content: "" } @top-right { content: "" } }
+```
 
-Page 1 holds the profile and full work history. Page 2 holds education, volunteer work, skills, and the extras block: languages, EDV and — designed variant only — hobbies.
+So the banner (name left, `Seite N / M` right, thin rule) appears on every sheet but the first, because the first sheet opens with the photo header instead. `counter(page)` and `counter(pages)` are real pagination counters: the numbers stay correct whatever the page count ends up being, which is why the label in the JSON is only the word (`labels.pagePrefix`, e.g. `Seite`) and never the numbers.
+
+The build injects `--cv-name` and `--cv-page-prefix` into a small `<style>` block in the template head (CSS-escaped, not HTML-escaped). Page margin boxes and the pagination counters need Chrome 131 or newer.
+
+Because pagination is derived, the two-page target is not enforced by the layout. The build reads the page count after printing and warns when a variant is not the expected number of pages; see the manifest in `dist/build.json`. Growing the content simply produces a third sheet with a correct `Seite 3 / 3` banner, and the break rules in `cv.css` are limited to what may not be split: a section heading stays with its block, an entry stays whole, and the 3-column skills list is not fragmented.
+
+The cover letter, `templates/cover-letter.html`, is one flow on the same `cv.css` page rules, so the letter prints in the same 182 mm column with the same header. It is one page when it fits; its `:first` page rule suppresses the banner, and the build expects one page and warns otherwise. The body is set at 11 pt justified, roughly 85 characters per line. A narrower `ch`/`em` cap was rejected: it left a wide empty right margin that no longer lined up with the header rule.
+
+The screen preview approximates the first printed page: the sheet width and padding match, but the banner lives in the print page margins, so it is not shown on screen.
 
 ## ATS notes
 

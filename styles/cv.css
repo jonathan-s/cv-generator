@@ -25,10 +25,11 @@
     "Segoe UI", sans-serif;
 
   --page-width: 210mm;
-  --page-height: 296mm;
-  --page-pad-top: 10mm;
   --page-pad-x: 14mm;
-  --page-pad-bottom: 10mm;
+  --sheet-pad-top: 10mm;
+  --sheet-pad-bottom: 12mm;
+  /* top page margin, holds the running banner */
+  --banner-band: 22mm;
 }
 
 * {
@@ -72,17 +73,9 @@ p {
 /* ---- screen canvas ------------------------------------------------------- */
 
 .document {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8mm;
-  padding: 8mm 0;
-}
-
-.page {
   width: var(--page-width);
-  min-height: var(--page-height);
-  padding: var(--page-pad-top) var(--page-pad-x) var(--page-pad-bottom);
+  margin: 8mm auto;
+  padding: var(--sheet-pad-top) var(--page-pad-x) var(--sheet-pad-bottom);
   background: var(--paper);
   box-shadow: 0 2px 16px rgba(30, 22, 16, 0.13);
 }
@@ -177,6 +170,8 @@ p {
   line-height: 1.2;
   letter-spacing: 0.15em;
   text-transform: uppercase;
+  break-after: avoid;
+  page-break-after: avoid;
 }
 
 /* cap the measure; 90ch at 10pt is ~160mm inside the 182mm column */
@@ -263,7 +258,7 @@ p {
   line-height: inherit;
 }
 
-/* ---- compact lists (skills, tools, hobbies) ------------------------------ */
+/* ---- compact multi-column lists ----------------------------------------- */
 
 .columns {
   margin: 0;
@@ -271,6 +266,8 @@ p {
   list-style: none;
   columns: 3;
   column-gap: 9mm;
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 .columns--2 {
@@ -287,9 +284,7 @@ p {
   margin-bottom: 0;
 }
 
-/* ---- short side-by-side sections ---------------------------------------- */
-
-/* ---- extras: languages, tools, hobbies -------------------------------- */
+/* ---- extras: languages, tools ------------------------------------------ */
 
 .facts {
   margin: 0;
@@ -324,34 +319,6 @@ p {
   margin: 0;
 }
 
-/* ---- second-page banner -------------------------------------------------- */
-
-.page-banner {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6mm;
-  padding-bottom: 3mm;
-  border-bottom: 0.5pt solid var(--rule-strong);
-}
-
-.page-banner__name {
-  color: var(--ink);
-  font-size: 15pt;
-  font-weight: 300;
-  line-height: 1.1;
-  letter-spacing: 0.065em;
-  text-transform: uppercase;
-}
-
-.page-banner__page {
-  flex: none;
-  color: var(--muted);
-  font-size: 8.2pt;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
 /* ---- closing ------------------------------------------------------------- */
 
 .closing {
@@ -362,9 +329,61 @@ p {
 
 /* ---- print / PDF --------------------------------------------------------- */
 
+/* Running banner in the page margin boxes; needs Chrome 131+. */
 @page {
   size: A4;
-  margin: 0;
+  margin: var(--banner-band) var(--page-pad-x) var(--sheet-pad-bottom);
+
+  /* both boxes span the column so the rule runs behind the gap between them;
+     the bottom margin lifts it off the content edge */
+  @top-left {
+    content: var(--cv-name);
+    width: 100%;
+    margin-bottom: 4mm;
+    padding-bottom: 3mm;
+    border-bottom: 0.5pt solid var(--rule-strong);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15pt;
+    font-weight: 300;
+    line-height: 1.1;
+    letter-spacing: 0.065em;
+    text-transform: uppercase;
+    vertical-align: bottom;
+    white-space: nowrap;
+  }
+
+  @top-right {
+    content: var(--cv-page-prefix) counter(page) " / " counter(pages);
+    width: 100%;
+    margin-bottom: 4mm;
+    padding-bottom: 3mm;
+    border-bottom: 0.5pt solid var(--rule-strong);
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 8.2pt;
+    line-height: 1.1;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-align: right;
+    vertical-align: bottom;
+    white-space: nowrap;
+  }
+}
+
+/* first sheet has the photo header instead */
+@page :first {
+  margin-top: var(--sheet-pad-top);
+
+  @top-left {
+    content: "";
+    border-bottom: 0;
+  }
+
+  @top-right {
+    content: "";
+    border-bottom: 0;
+  }
 }
 
 @media print {
@@ -381,23 +400,16 @@ p {
   }
 
   .document {
-    display: block;
+    width: auto;
     margin: 0;
     padding: 0;
-  }
-
-  .page {
-    width: var(--page-width);
-    min-height: var(--page-height);
-    margin: 0;
+    background: none;
     box-shadow: none;
-    break-after: page;
-    page-break-after: always;
   }
 
-  .page:last-child {
-    break-after: auto;
-    page-break-after: auto;
+  .identity {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   a {

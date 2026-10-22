@@ -7,72 +7,68 @@
   <meta name="author" content="{{name}}">
   <title>{{title}}</title>
   <link rel="stylesheet" href="./cv.css">
+  <style>
+    /* read by the @page margin boxes in cv.css */
+    :root {
+      --cv-name: "{{nameCss}}";
+      --cv-page-prefix: "{{pagePrefixCss}}";
+    }
+  </style>
 </head>
 <body>
   <main class="document">
 
-    <!-- ================= PAGE 1 ================= -->
-    <article class="page page--first" aria-label="Lebenslauf, Seite 1">
-      <header class="identity">
-        <div class="identity__photo">
-          <img src="{{photo}}" alt="Porträt von {{name}}">
+    <header class="identity">
+      <div class="identity__photo">
+        <img src="{{photo}}" alt="Porträt von {{name}}">
+      </div>
+      <div class="identity__body">
+        <h1 class="identity__name">{{name}}</h1>
+        <p class="identity__tagline">{{tagline}}</p>
+        <div class="contact">{{contact}}</div>
+      </div>
+    </header>
+
+    <section class="section summary">
+      <h2 class="section__title">{{labels.summary}}</h2>
+      {{summary}}
+    </section>
+
+    <section class="section">
+      <h2 class="section__title">{{labels.skills}}</h2>
+      <ul class="columns">{{technicalSkills}}</ul>
+    </section>
+
+    <section class="section">
+      <h2 class="section__title">{{labels.experience}}</h2>
+      {{experience}}
+    </section>
+
+    <section class="section">
+      <h2 class="section__title">{{labels.education}}</h2>
+      {{education}}
+    </section>
+
+    <section class="section">
+      <h2 class="section__title">{{labels.volunteer}}</h2>
+      {{volunteer}}
+    </section>
+
+    <section class="section">
+      <h2 class="section__title">{{labels.extras}}</h2>
+      <dl class="facts">
+        <div class="fact">
+          <dt>{{labels.languages}}</dt>
+          <dd>{{languagesInline}}</dd>
         </div>
-        <div class="identity__body">
-          <h1 class="identity__name">{{name}}</h1>
-          <p class="identity__tagline">{{tagline}}</p>
-          <div class="contact">{{contact}}</div>
+        <div class="fact">
+          <dt>{{labels.tools}}</dt>
+          <dd>{{toolsInline}}</dd>
         </div>
-      </header>
+      </dl>
+    </section>
 
-      <section class="section summary">
-        <h2 class="section__title">{{labels.summary}}</h2>
-        {{summary}}
-      </section>
-
-      <section class="section">
-        <h2 class="section__title">{{labels.skills}}</h2>
-        <ul class="columns">{{technicalSkills}}</ul>
-      </section>
-
-      <section class="section">
-        <h2 class="section__title">{{labels.experience}}</h2>
-        {{experience}}
-      </section>
-    </article>
-
-    <!-- ================= PAGE 2 ================= -->
-    <article class="page page--second" aria-label="Lebenslauf, Seite 2">
-      <header class="page-banner">
-        <span class="page-banner__name">{{name}}</span>
-        <span class="page-banner__page">{{labels.page}}</span>
-      </header>
-
-      <section class="section">
-        <h2 class="section__title">{{labels.education}}</h2>
-        {{education}}
-      </section>
-
-      <section class="section">
-        <h2 class="section__title">{{labels.volunteer}}</h2>
-        {{volunteer}}
-      </section>
-
-      <section class="section">
-        <h2 class="section__title">{{labels.extras}}</h2>
-        <dl class="facts">
-          <div class="fact">
-            <dt>{{labels.languages}}</dt>
-            <dd>{{languagesInline}}</dd>
-          </div>
-          <div class="fact">
-            <dt>{{labels.tools}}</dt>
-            <dd>{{toolsInline}}</dd>
-          </div>
-        </dl>
-      </section>
-
-      <p class="closing">{{closingPlace}}, {{closingDate}}</p>
-    </article>
+    <p class="closing">{{closingPlace}}, {{closingDate}}</p>
 
   </main>
 </body>
